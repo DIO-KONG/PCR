@@ -8,14 +8,14 @@ from utils.transforms import orthogonality_error
 
 
 METRIC_KEYS = (
-    "fitness",
-    "inlier_rmse",
-    "median_nn_dist",
-    "trimmed_mean_nn_dist",
-    "overlap_ratio",
-    "det_R",
-    "orthogonality_error",
-    "translation_norm",
+    "eval_fitness",
+    "eval_inlier_rmse",
+    "eval_median_nn_dist",
+    "eval_trimmed_mean_nn_dist",
+    "eval_overlap_ratio",
+    "eval_det_R",
+    "eval_orthogonality_error",
+    "eval_translation_norm",
 )
 
 
@@ -38,18 +38,9 @@ def evaluate_registration(
     record: dict[str, Any] = empty_registration_metrics()
     record.update(
         {
-            "det_R": float(np.linalg.det(matrix[:3, :3])),
-            "orthogonality_error": orthogonality_error(matrix),
-            "translation_norm": float(np.linalg.norm(matrix[:3, 3])),
-        }
-    )
-
-    result_fitness = getattr(registration_result, "fitness", None)
-    result_rmse = getattr(registration_result, "inlier_rmse", None)
-    record.update(
-        {
-            "fitness": float(result_fitness) if result_fitness is not None else None,
-            "inlier_rmse": float(result_rmse) if result_rmse is not None else None,
+            "eval_det_R": float(np.linalg.det(matrix[:3, :3])),
+            "eval_orthogonality_error": orthogonality_error(matrix),
+            "eval_translation_norm": float(np.linalg.norm(matrix[:3, 3])),
         }
     )
 
@@ -61,17 +52,17 @@ def evaluate_registration(
             keep = max(1, int(len(distances) * trimmed_ratio))
             overlap_threshold = float(config.get("overlap_threshold", config.get("max_correspondence_distance", 0.1)))
             inlier_distances = distances[distances <= overlap_threshold]
+            eval_fitness = float(len(inlier_distances) / len(distances))
             record.update(
                 {
-                    "median_nn_dist": float(np.median(distances)),
-                    "trimmed_mean_nn_dist": float(np.mean(np.sort(distances)[:keep])),
-                    "overlap_ratio": float(len(inlier_distances) / len(distances)),
+                    "eval_fitness": eval_fitness,
+                    "eval_median_nn_dist": float(np.median(distances)),
+                    "eval_trimmed_mean_nn_dist": float(np.mean(np.sort(distances)[:keep])),
+                    "eval_overlap_ratio": eval_fitness,
                 }
             )
-            if record["fitness"] is None:
-                record["fitness"] = record["overlap_ratio"]
-            if record["inlier_rmse"] is None and len(inlier_distances):
-                record["inlier_rmse"] = float(np.sqrt(np.mean(inlier_distances**2)))
+            if len(inlier_distances):
+                record["eval_inlier_rmse"] = float(np.sqrt(np.mean(inlier_distances**2)))
     except Exception as exc:
         record["metric_error"] = str(exc)
 

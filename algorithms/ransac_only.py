@@ -65,13 +65,21 @@ def run(prepared_source: Any, prepared_target: Any, params: Mapping[str, Any] | 
         return RegistrationResult(
             method=METHOD_NAME,
             status=status,
-            transformation=transformation,
+            transformation=transformation if status == "success" else None,
             runtime_sec=time.perf_counter() - started,
             fitness=float(result.fitness),
             inlier_rmse=float(result.inlier_rmse),
             correspondence_set_size=corr_count,
             params=used_params,
             error=error,
+            algorithm_metrics={
+                "fitness": float(result.fitness),
+                "inlier_rmse": float(result.inlier_rmse),
+                "correspondence_set_size": corr_count,
+                "max_iteration": int(used_params["max_iteration"]),
+                "confidence": float(used_params["confidence"]),
+                "ransac_n": int(used_params["ransac_n"]),
+            },
         )
     except Exception as exc:
         return RegistrationResult.failed(METHOD_NAME, str(exc), used_params)

@@ -36,7 +36,7 @@
 - 提供共享工具：IO、预处理、缓存、评估、矩阵工具、可视化、报告。
 - 算法或 workflow 调用 utils，但 utils 不负责执行实验或算法逻辑。
 - 预处理入口优先使用 `prepare_point_cloud_from_path_with_cache()`，缓存键必须包含源文件签名和预处理配置。
-- 指标输出字段统一为 fitness、inlier_rmse、median_nn_dist、trimmed_mean_nn_dist、overlap_ratio、det_R、orthogonality_error、translation_norm。
+- 公共评估指标输出字段统一为 eval_fitness、eval_inlier_rmse、eval_median_nn_dist、eval_trimmed_mean_nn_dist、eval_overlap_ratio、eval_det_R、eval_orthogonality_error、eval_translation_norm。
 
 ### data/
 - raw/：只读原始点云。
@@ -54,10 +54,12 @@
 - 输出：
   - method: 算法名
   - status: success / failed / skipped
-  - 4x4 transformation matrix
-  - runtime, 参数使用情况, 错误信息
+  - success 时输出 4x4 transformation matrix
+  - failed / skipped 时 transformation 必须为 None，`has_valid_transform=false`
+  - algorithm_time, 参数使用情况, 错误信息
 - 不允许伪造成功状态；缺失依赖返回 skipped。
 - 矩阵方向必须符合 source -> target；方向不明确时需同时评估 T 和 T^-1。
+- 算法内部指标必须使用 `algorithm_*` 字段记录；公共评估指标必须使用 `eval_*` 字段记录。
 
 ## 可视化约束
 - 允许 GUI 弹窗展示点云。
@@ -68,4 +70,5 @@
 - 只有 `success` 结果保存矩阵、cloud 和 overlay；`failed` / `skipped` 只写 metrics、report 和 error。
 - 保存矩阵为 4x4 txt，格式统一。
 - CSV/JSON/Markdown 报告需包含算法、参数、运行指标、矩阵路径、cloud 路径、状态/错误信息。
+- 每条结果必须记录 preprocess_time、algorithm_time、evaluation_time、artifact_time、total_time。
 - 每次运行生成独立目录，避免覆盖历史数据。

@@ -3,4 +3,6 @@
 - 禁止在算法内部实现 sweep、benchmark 或随机稳定性逻辑。
 - 可以实现算法内部小工具，如矩阵方向检查、结果封装。
 - 缺失依赖必须返回 `skipped`，不得抛出未处理异常或伪造 `success`。
-- 算法输出矩阵必须是 source -> target；算法不保存文件、不写报告。
+- success 输出矩阵必须是 source -> target；failed/skipped 的 transformation 必须为 None。
+- 算法不保存文件、不写报告。
+- 算法内部指标写入 `algorithm_metrics`，最终报告字段使用 `algorithm_*` 前缀。

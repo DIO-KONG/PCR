@@ -116,14 +116,15 @@ run_standard.bat --config configs\default.yaml
 - `metrics.csv`：扁平指标表。
 - `metrics.json`：完整结构化指标。
 
-一次 standard benchmark 只创建一个 `results/standard/<run_id>/`，所有算法结果写入同一目录。只有 `success` 会保存 matrix、cloud 和 overlay；`failed` / `skipped` 只写 metrics、report 和 error。
+一次 standard benchmark 只创建一个 `results/standard/<run_id>/`，所有算法结果写入同一目录。只有 `success` 且 `has_valid_transform=true` 会保存 matrix、cloud 和 overlay；`failed` / `skipped` 的 transformation 为 `None`，只写 metrics、report 和 error。
 
-统一指标字段：
-- `fitness`
-- `inlier_rmse`
-- `median_nn_dist`
-- `trimmed_mean_nn_dist`
-- `overlap_ratio`
-- `det_R`
-- `orthogonality_error`
-- `translation_norm`
+指标字段拆分：
+- `algorithm_*`：算法内部产生的指标，如 `algorithm_fitness`、`algorithm_inlier_rmse`、`algorithm_correspondence_set_size`。
+- `eval_*`：workflow/testbench 使用统一 evaluator 重新计算的公共指标，如 `eval_fitness`、`eval_inlier_rmse`、`eval_median_nn_dist`、`eval_trimmed_mean_nn_dist`、`eval_overlap_ratio`、`eval_det_R`、`eval_orthogonality_error`、`eval_translation_norm`。
+
+运行时间字段：
+- `preprocess_time`：读取点云、缓存命中/重算、下采样、normal、FPFH 的耗时。
+- `algorithm_time`：算法本体耗时。
+- `evaluation_time`：统一 evaluator 重新计算公共指标的耗时。
+- `artifact_time`：保存 matrix/cloud/overlay 的耗时。
+- `total_time`：本条 pairwise 任务总耗时。

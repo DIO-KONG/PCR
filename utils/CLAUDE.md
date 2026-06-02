@@ -4,4 +4,5 @@
 - `prepare_point_cloud_from_path_with_cache()` 是 workflow 默认预处理入口。
 - cache 命中依据至少包含点云路径、文件大小、mtime 和预处理配置。
 - cache 失败不得中断配准流程；应回退到重新预处理。
-- `evaluate_registration()` 输出字段固定：fitness、inlier_rmse、median_nn_dist、trimmed_mean_nn_dist、overlap_ratio、det_R、orthogonality_error、translation_norm。
+- `evaluate_registration()` 输出字段固定：eval_fitness、eval_inlier_rmse、eval_median_nn_dist、eval_trimmed_mean_nn_dist、eval_overlap_ratio、eval_det_R、eval_orthogonality_error、eval_translation_norm。
+- reporting 必须保留 `algorithm_*` 与 `eval_*` 前缀，不得输出裸 `fitness` / `inlier_rmse` 字段。

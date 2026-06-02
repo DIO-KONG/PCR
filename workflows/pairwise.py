@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import time
 from typing import Any, Mapping
 
 from algorithms.base import RegistrationResult
@@ -14,6 +15,14 @@ def run_pairwise_task(
     output_dir: str | Path | None = None,
     write_report: bool = True,
 ) -> dict[str, Any]:
+    total_started = time.perf_counter()
+    timings = {
+        "preprocess_time": 0.0,
+        "algorithm_time": 0.0,
+        "evaluation_time": 0.0,
+        "artifact_time": 0.0,
+        "total_time": 0.0,
+    }
     config = dict(default_config or {})
     algorithm_config = dict(config.get("algorithm", {}))
     algorithm_config.update(dict(task.get("algorithm", {})))
@@ -31,12 +40,18 @@ def run_pairwise_task(
     target_pcd = None
     metric_record = metrics.empty_registration_metrics()
     try:
+        preprocess_started = time.perf_counter()
         prepared_source = preprocessing.prepare_point_cloud_from_path_with_cache(source["path"], prep_config)
         prepared_target = preprocessing.prepare_point_cloud_from_path_with_cache(target["path"], prep_config)
         source_pcd = prepared_source["raw_pcd"]
         target_pcd = prepared_target["raw_pcd"]
+        timings["preprocess_time"] = time.perf_counter() - preprocess_started
+
+        algorithm_started = time.perf_counter()
         result = spec.runner(prepared_source, prepared_target, algorithm_params)
-        if result.status == "success":
+        timings["algorithm_time"] = result.runtime_sec or (time.perf_counter() - algorithm_started)
+        if result.status == "success" and result.has_valid_transform:
+            evaluation_started = time.perf_counter()
             metric_record = metrics.evaluate_registration(
                 source_pcd,
                 target_pcd,
@@ -44,6 +59,7 @@ def run_pairwise_task(
                 dict(config.get("metrics", {})),
                 registration_result=result,
             )
+            timings["evaluation_time"] = time.perf_counter() - evaluation_started
         else:
             metric_record = metrics.empty_registration_metrics(result.error)
     except RuntimeError as exc:
@@ -64,8 +80,12 @@ def run_pairwise_task(
         )
     else:
         output_dir = reporting.ensure_run_dirs(output_dir)
+    artifact_started = time.perf_counter()
     artifacts = _write_artifacts(output_dir, source_pcd, target_pcd, result, metric_record, source, target)
+    timings["artifact_time"] = time.perf_counter() - artifact_started
+    timings["total_time"] = time.perf_counter() - total_started
     record = reporting.combine_record(task, result, metric_record, artifacts)
+    record.update(timings)
     if write_report:
         reporting.write_metrics(output_dir, [record])
         reporting.write_markdown_report(output_dir / "report" / "summary.md", [record])
@@ -90,7 +110,7 @@ def _write_artifacts(
     source_meta: Mapping[str, Any],
     target_meta: Mapping[str, Any],
 ) -> dict[str, str]:
-    if result.status == "success" and source_pcd is not None and target_pcd is not None:
+    if result.has_valid_transform and source_pcd is not None and target_pcd is not None:
         stem = f"{result.method}__{source_meta.get('id', 'source')}__to__{target_meta.get('id', 'target')}"
         matrix_path = output_dir / "matrix" / f"{stem}.txt"
         transformed_path = output_dir / "cloud" / f"{stem}__registered.ply"
