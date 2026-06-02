@@ -1,0 +1,44 @@
+project:
+  name: PCR
+  seed: 42
+
+paths:
+  raw_dir: data/raw
+  cache_dir: data/cache
+  results_dir: results
+
+preprocessing:
+  voxel_size: 0.05
+  remove_statistical_outlier:
+    enabled: true
+    nb_neighbors: 20
+    std_ratio: 2.0
+  normals:
+    radius_factor: 2.0
+    max_nn: 30
+  fpfh:
+    radius_factor: 5.0
+    max_nn: 100
+  roi:
+    enabled: false
+    min_bound: null
+    max_bound: null
+  cache:
+    enabled: true
+
+algorithm:
+  name: ransac_only
+  params:
+    distance_threshold_factor: 1.5
+    ransac_n: 4
+    max_iteration: 100000
+    confidence: 0.999
+
+metrics:
+  trimmed_ratio: 0.9
+  orthogonality_tolerance: 1.0e-3
+
+output:
+  save_transformed_cloud: true
+  save_overlay_cloud: true
+  visualize: false

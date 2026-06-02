@@ -1,0 +1,30 @@
+# portable environment
+.env/
+
+# point cloud data
+*.ply
+*.pcd
+*.las
+*.laz
+
+# generated caches and outputs
+data/cache/
+results/
+dependencies/*/build/
+dependencies/*/install/
+
+# python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# temporary snapshots
+_snapshot_for_chatgpt/
+*_snapshot*.zip
+
+# editor/system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

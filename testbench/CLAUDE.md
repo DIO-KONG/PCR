@@ -1,0 +1,4 @@
+- standard/ 放所有注册算法通用标准测试。
+- specified/ 放算法或 pipeline 的针对性实验。
+- testbench 可以调用 workflows、algorithms 和 utils。
+- 算法模块不得调用 testbench。

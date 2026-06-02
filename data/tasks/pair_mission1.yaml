@@ -1,0 +1,24 @@
+task:
+  id: pair_mission1
+  type: pairwise
+  description: One source cloud registered to one target map cloud.
+
+source:
+  id: 16_incremental
+  path: data/raw/16_incremental.ply
+
+target:
+  id: 14_world
+  path: data/raw/14_world.ply
+
+algorithm:
+  name: ransac_only
+  params:
+    distance_threshold_factor: 1.5
+    ransac_n: 4
+    max_iteration: 100000
+    confidence: 0.999
+
+output:
+  category: specified
+  experiment: mission1_pairwise

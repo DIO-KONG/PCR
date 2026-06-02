@@ -1,0 +1,4 @@
+- 管理配准场景和数据流。
+- 调用 algorithms 接口和 utils。
+- 不实现算法内部逻辑。
+- 负责绑定 source 到 target、top-k 筛选、游离标记。

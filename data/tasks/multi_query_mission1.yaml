@@ -1,0 +1,30 @@
+task:
+  id: multi_query_mission1
+  type: multi_to_one
+  description: Multiple source query clouds registered to one target map cloud.
+
+sources:
+  - id: 16_incremental
+    path: data/raw/16_incremental.ply
+
+target:
+  id: 14_world
+  path: data/raw/14_world.ply
+
+algorithm:
+  name: ransac_only
+  params:
+    distance_threshold_factor: 1.5
+    ransac_n: 4
+    max_iteration: 100000
+    confidence: 0.999
+
+assignment:
+  top_k: 1
+  free_threshold:
+    min_fitness: 0.1
+    max_rmse: 1.0
+
+output:
+  category: specified
+  experiment: mission1_multi_to_one
