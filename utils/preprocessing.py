@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Mapping
+
+from utils import cache, io
 
 
 def prepare_point_cloud(pcd: Any, config: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -48,3 +51,40 @@ def prepare_point_cloud(pcd: Any, config: Mapping[str, Any] | None = None) -> di
         ),
     )
     return {"pcd": working, "pcd_down": pcd_down, "fpfh": fpfh, "voxel_size": voxel_size}
+
+
+def prepare_point_cloud_from_path_with_cache(path: str | Path, config: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    config = dict(config or {})
+    raw_pcd = io.read_point_cloud(path)
+    cache_config = dict(config.get("cache", {}))
+    cache_enabled = bool(cache_config.get("enabled", True))
+    cache_dir = Path(cache_config.get("dir", "data/cache"))
+    key = cache.cache_key(path, config)
+    prepared_cache_path = cache.cache_path(cache_dir, key)
+
+    cache_error = None
+    if cache_enabled and cache.is_cache_hit(prepared_cache_path):
+        try:
+            prepared = cache.load_cache(prepared_cache_path)
+            prepared["cache_hit"] = True
+        except Exception as exc:
+            cache_error = f"cache load failed: {exc}"
+            prepared = prepare_point_cloud(raw_pcd, config)
+            prepared["cache_hit"] = False
+    else:
+        prepared = prepare_point_cloud(raw_pcd, config)
+        cache_payload = {k: v for k, v in prepared.items() if k != "pcd"}
+        if cache_enabled:
+            try:
+                cache.save_cache(prepared_cache_path, cache_payload)
+            except Exception as exc:
+                cache_error = f"cache save failed: {exc}"
+        prepared["cache_hit"] = False
+
+    prepared["pcd"] = raw_pcd
+    prepared["raw_pcd"] = raw_pcd
+    prepared["cache_key"] = key
+    prepared["cache_path"] = str(prepared_cache_path)
+    if cache_error:
+        prepared["cache_error"] = cache_error
+    return prepared

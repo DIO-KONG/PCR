@@ -2,3 +2,7 @@
 - 调用 algorithms 接口和 utils。
 - 不实现算法内部逻辑。
 - 负责绑定 source 到 target、top-k 筛选、游离标记。
+- pairwise workflow 负责读取 task、调用缓存预处理、调用算法、写结果记录。
+- pairwise 只有 success 才保存 matrix/cloud/overlay；failed/skipped 只保存 metrics/report/error。
+- standard benchmark 可传入共享 run 目录，workflow 不得强制为每个算法创建单独 standard run。
+- multi_to_one 默认保留每个 source 的结果；top-k 只在显式配置时启用。

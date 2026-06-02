@@ -59,7 +59,9 @@ def run(prepared_source: Any, prepared_target: Any, params: Mapping[str, Any] | 
         )
 
         transformation = require_source_to_target_matrix(result.transformation)
-        status = "success" if np.isfinite(transformation).all() else "failed"
+        corr_count = correspondence_count(result)
+        status = "success" if result.fitness > 0.0 and (corr_count is None or corr_count > 0) else "failed"
+        error = None if status == "success" else "RANSAC produced no valid correspondences."
         return RegistrationResult(
             method=METHOD_NAME,
             status=status,
@@ -67,8 +69,9 @@ def run(prepared_source: Any, prepared_target: Any, params: Mapping[str, Any] | 
             runtime_sec=time.perf_counter() - started,
             fitness=float(result.fitness),
             inlier_rmse=float(result.inlier_rmse),
-            correspondence_set_size=correspondence_count(result),
+            correspondence_set_size=corr_count,
             params=used_params,
+            error=error,
         )
     except Exception as exc:
         return RegistrationResult.failed(METHOD_NAME, str(exc), used_params)

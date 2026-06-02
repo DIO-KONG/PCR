@@ -2,3 +2,6 @@
 - specified/ 放算法或 pipeline 的针对性实验。
 - testbench 可以调用 workflows、algorithms 和 utils。
 - 算法模块不得调用 testbench。
+- `standard/run_standard.py` 每次运行只创建一个 `results/standard/<run_id>/`。
+- 同一次 standard run 中所有算法共享 cloud/matrix/report/metrics 输出目录。
+- standard 负责聚合 metrics.csv、metrics.json 和 report/summary.md。

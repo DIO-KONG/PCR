@@ -13,6 +13,11 @@ def make_run_id(prefix: str = "run") -> str:
 
 def make_run_dir(root: str | Path, prefix: str = "run") -> Path:
     run_dir = Path(root) / make_run_id(prefix)
+    return ensure_run_dirs(run_dir)
+
+
+def ensure_run_dirs(run_dir: str | Path) -> Path:
+    run_dir = Path(run_dir)
     for child in ("cloud", "matrix", "report"):
         (run_dir / child).mkdir(parents=True, exist_ok=True)
     return run_dir
@@ -56,7 +61,10 @@ def write_markdown_report(path: str | Path, records: Iterable[Mapping[str, Any]]
                 f"- Source: `{row.get('source_id')}`",
                 f"- Target: `{row.get('target_id')}`",
                 f"- Fitness: `{row.get('fitness')}`",
-                f"- RMSE: `{row.get('inlier_rmse') or row.get('rmse')}`",
+                f"- Inlier RMSE: `{row.get('inlier_rmse')}`",
+                f"- Median NN Distance: `{row.get('median_nn_dist')}`",
+                f"- Trimmed Mean NN Distance: `{row.get('trimmed_mean_nn_dist')}`",
+                f"- Overlap Ratio: `{row.get('overlap_ratio')}`",
                 f"- Matrix: `{row.get('matrix_path')}`",
                 f"- Cloud: `{row.get('cloud_path')}`",
                 f"- Error: `{row.get('error')}`",

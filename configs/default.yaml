@@ -8,7 +8,7 @@ paths:
   results_dir: results
 
 preprocessing:
-  voxel_size: 0.05
+  voxel_size: 0.8
   remove_statistical_outlier:
     enabled: true
     nb_neighbors: 20
@@ -25,17 +25,19 @@ preprocessing:
     max_bound: null
   cache:
     enabled: true
+    dir: data/cache
 
 algorithm:
   name: ransac_only
   params:
-    distance_threshold_factor: 1.5
+    distance_threshold_factor: 2.0
     ransac_n: 4
     max_iteration: 100000
     confidence: 0.999
 
 metrics:
   trimmed_ratio: 0.9
+  overlap_threshold: 1.0
   orthogonality_tolerance: 1.0e-3
 
 output:

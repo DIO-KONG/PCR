@@ -63,7 +63,7 @@ D:\coding\Anaconda\Scripts\conda.exe create -p .env python=3.10 -y
 - `PyYAML`：读取配置和任务 YAML。
 
 推荐依赖：
-- `open3d`：点云 IO、下采样、normal、FPFH、RANSAC 配准、可视化。缺失时算法返回 `skipped`。
+- `open3d`：点云 IO、下采样、normal、FPFH、RANSAC 配准、可视化。`ransac_only` 实际运行需要它；缺失时算法返回 `skipped`。
 
 标准库依赖：
 - `argparse`、`csv`、`json`、`hashlib`、`pathlib`、`dataclasses`、`time` 等。
@@ -74,6 +74,16 @@ D:\coding\Anaconda\Scripts\conda.exe create -p .env python=3.10 -y
 - Open3D：MIT。
 
 ## 常用命令
+推荐使用根目录 bat 入口：
+
+```bat
+check_env.bat
+run_pairwise.bat --task data\tasks\pair_mission1.yaml
+run_multi_to_one.bat --task data\tasks\multi_query_mission1.yaml
+run_multi_to_multi.bat --task data\tasks\block_matching_mission1.yaml
+run_standard.bat --config configs\default.yaml
+```
+
 一对一任务：
 
 ```bat
@@ -105,3 +115,15 @@ D:\coding\Anaconda\Scripts\conda.exe create -p .env python=3.10 -y
 - `report/`：Markdown 报告。
 - `metrics.csv`：扁平指标表。
 - `metrics.json`：完整结构化指标。
+
+一次 standard benchmark 只创建一个 `results/standard/<run_id>/`，所有算法结果写入同一目录。只有 `success` 会保存 matrix、cloud 和 overlay；`failed` / `skipped` 只写 metrics、report 和 error。
+
+统一指标字段：
+- `fitness`
+- `inlier_rmse`
+- `median_nn_dist`
+- `trimmed_mean_nn_dist`
+- `overlap_ratio`
+- `det_R`
+- `orthogonality_error`
+- `translation_norm`

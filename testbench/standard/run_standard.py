@@ -11,6 +11,7 @@ from workflows.pairwise import run_pairwise_task
 def run_standard(config: Mapping[str, Any]) -> list[dict[str, Any]]:
     task_path = Path("data/tasks/pair_mission1.yaml")
     task = io.read_config(task_path)
+    run_dir = reporting.make_run_dir(Path("results") / "standard", "standard")
     records = []
     for algorithm_name in list_algorithms():
         task_for_algorithm = dict(task)
@@ -19,6 +20,7 @@ def run_standard(config: Mapping[str, Any]) -> list[dict[str, Any]]:
             "params": dict(config.get("algorithm", {}).get("params", {})),
         }
         task_for_algorithm["output"] = {"category": "standard"}
-        records.append(run_pairwise_task(task_for_algorithm, config))
-    reporting.write_markdown_report(Path("results/standard/latest_summary.md"), records)
+        records.append(run_pairwise_task(task_for_algorithm, config, output_dir=run_dir, write_report=False))
+    reporting.write_metrics(run_dir, records)
+    reporting.write_markdown_report(run_dir / "report" / "summary.md", records)
     return records

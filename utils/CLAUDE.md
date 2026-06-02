@@ -1,3 +1,7 @@
 - 提供点云 IO、预处理、缓存、评估指标、可视化和报告生成工具。
 - 不实现算法或实验逻辑。
 - 支持不同算法复用，接口清晰。
+- `prepare_point_cloud_from_path_with_cache()` 是 workflow 默认预处理入口。
+- cache 命中依据至少包含点云路径、文件大小、mtime 和预处理配置。
+- cache 失败不得中断配准流程；应回退到重新预处理。
+- `evaluate_registration()` 输出字段固定：fitness、inlier_rmse、median_nn_dist、trimmed_mean_nn_dist、overlap_ratio、det_R、orthogonality_error、translation_norm。

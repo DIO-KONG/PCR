@@ -10,6 +10,7 @@
 - 不依赖系统 PATH 中的 python、conda 或 pip。
 - 可在 `dependencies/` 下本地化安装缺失依赖。
 - 所有第三方依赖必须在 README.md 中明确说明其用途和是否必需。
+- 根目录 `.bat` 入口必须调用 `.env\python.exe`，不得依赖 PATH。
 
 ## 文件夹职责
 
@@ -23,6 +24,7 @@
 - 管理不同配准场景 (一对一、多对一、多对多) 的执行逻辑。
 - 拆解复杂任务为 pairwise 调用，并处理绑定、top-k、游离标记。
 - 不直接实现算法，只调算法接口和 utils。
+- multi_to_one 默认返回每个 source 的结果；只有显式 `mode: top_k` 或 `apply_top_k: true` 才做全局 top-k 截断。
 
 ### testbench/
 - 包含实验逻辑。
@@ -33,6 +35,8 @@
 ### utils/
 - 提供共享工具：IO、预处理、缓存、评估、矩阵工具、可视化、报告。
 - 算法或 workflow 调用 utils，但 utils 不负责执行实验或算法逻辑。
+- 预处理入口优先使用 `prepare_point_cloud_from_path_with_cache()`，缓存键必须包含源文件签名和预处理配置。
+- 指标输出字段统一为 fitness、inlier_rmse、median_nn_dist、trimmed_mean_nn_dist、overlap_ratio、det_R、orthogonality_error、translation_norm。
 
 ### data/
 - raw/：只读原始点云。
@@ -43,6 +47,7 @@
 - 保存实验结果。
 - 分为 standard/ 和 specified/，每次运行生成独立 `<run_id>` 目录。
 - 不允许在结果目录放置源代码。
+- 一次 standard benchmark 只能创建一个 `results/standard/<run_id>/`，所有算法结果写入同一 run 目录。
 
 ## 算法接口约束
 - 输入：预处理后的 source 和 target 点云，参数字典。
@@ -60,6 +65,7 @@
 - overlay 默认：target=灰色, transformed source=黄色。
 
 ## 结果约束
+- 只有 `success` 结果保存矩阵、cloud 和 overlay；`failed` / `skipped` 只写 metrics、report 和 error。
 - 保存矩阵为 4x4 txt，格式统一。
 - CSV/JSON/Markdown 报告需包含算法、参数、运行指标、矩阵路径、cloud 路径、状态/错误信息。
 - 每次运行生成独立目录，避免覆盖历史数据。

@@ -2,3 +2,5 @@
 - cache/ 可存储预处理结果，用于算法复用。
 - tasks/ 描述不同实验/场景任务，不直接修改点云。
 - 禁止在 raw/ 中修改、裁剪或重色。
+- tasks 只描述 source、target、algorithm、assignment 和 output，不承载实验结果。
+- raw 文件变化会影响预处理缓存键。

@@ -1,8 +1,8 @@
 algorithm:
   name: ransac_only
   params:
-    voxel_size: 0.05
-    distance_threshold_factor: 1.5
+    voxel_size: 0.8
+    distance_threshold_factor: 2.0
     ransac_n: 4
     max_iteration: 100000
     confidence: 0.999

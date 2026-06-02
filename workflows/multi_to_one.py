@@ -17,6 +17,9 @@ def run_multi_to_one_task(task: Mapping[str, Any], default_config: Mapping[str, 
         records.append(run_pairwise_task(pair_task, default_config))
 
     assignment = dict(task.get("assignment", {}))
-    top_k = int(assignment.get("top_k", len(records)))
     threshold = assignment.get("free_threshold", {})
-    return [mark_free(record, threshold) for record in select_top_k(records, top_k)]
+    marked = [mark_free(record, threshold) for record in records]
+    if assignment.get("mode") == "top_k" or assignment.get("apply_top_k", False):
+        top_k = int(assignment.get("top_k", len(marked)))
+        return select_top_k(marked, top_k)
+    return marked
