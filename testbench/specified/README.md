@@ -7,3 +7,12 @@
 - 不修改 `data/raw/`。
 - 输出到 `results/specified/<algorithm>/<experiment>/<run_id>/`。
 - 可复用 `workflows/` 和 `utils/`，不把实验逻辑写入 `algorithms/`。
+
+## gicp_refine
+
+当前包含：
+- `gicp_refine/random_stability.py`
+- `gicp_refine/parameter_robustness.py`
+- `gicp_refine/ablation.py`
+
+这些实验只比较 `gicp_refine` 方案和必要 baseline，不新增算法，不改变 algorithms 统一接口。

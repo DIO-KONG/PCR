@@ -23,6 +23,7 @@ DEFAULT_PARAMS = {
     "gicp_downsampling_resolution": 0.8,
     "gicp_num_threads": 1,
     "gicp_verbose": False,
+    "enable_refine": True,
 }
 
 
@@ -115,6 +116,32 @@ def run(prepared_source: Any, prepared_target: Any, params: Mapping[str, Any] | 
             )
 
         init_transform = require_source_to_target_matrix(best_result.transformation)
+        if not bool(used_params["enable_refine"]):
+            return RegistrationResult(
+                method=METHOD_NAME,
+                status="success",
+                transformation=init_transform,
+                runtime_sec=time.perf_counter() - started,
+                fitness=float(best_trial["fitness"]),
+                inlier_rmse=float(best_trial["inlier_rmse"]),
+                correspondence_set_size=best_trial["correspondence_set_size"],
+                params=used_params,
+                algorithm_metrics={
+                    "ransac_trials": ransac_trials,
+                    "best_trial": best_trial["trial"],
+                    "best_coarse_fitness": float(best_trial["fitness"]),
+                    "best_coarse_inlier_rmse": float(best_trial["inlier_rmse"]),
+                    "all_trials": all_trials,
+                    "gicp_converged": None,
+                    "gicp_error": None,
+                    "gicp_iterations": None,
+                    "gicp_num_inliers": None,
+                    "coarse_time": coarse_time,
+                    "refine_time": 0.0,
+                    "refine_enabled": False,
+                },
+            )
+
         refine_started = time.perf_counter()
         source_points = np.asarray(source_pcd.points, dtype=np.float64)
         target_points = np.asarray(target_pcd.points, dtype=np.float64)
@@ -161,6 +188,7 @@ def run(prepared_source: Any, prepared_target: Any, params: Mapping[str, Any] | 
                 "gicp_num_inliers": gicp_num_inliers,
                 "coarse_time": coarse_time,
                 "refine_time": refine_time,
+                "refine_enabled": True,
             },
         )
     except Exception as exc:

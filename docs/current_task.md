@@ -10,3 +10,4 @@
 - 矩阵方向：`P_target ≈ T @ P_source`。
 - standard benchmark 每次运行聚合到单一 `results/standard/<run_id>/`。
 - pairwise workflow 使用预处理缓存入口。
+- 当前 specified 实验集中评估 `gicp_refine` 的随机稳定性、参数鲁棒性和消融组合。

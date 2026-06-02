@@ -1,0 +1,20 @@
+algorithm:
+  name: gicp_refine
+  profile: balanced_best_of_5
+  selection_note: >
+    Selected from specified experiments on pair_mission1. The balanced setting keeps
+    coarse voxel size 0.8, RANSAC distance factor 2.0, best-of-5 RANSAC, and GICP
+    downsampling 0.8 because it produced the best stability/accuracy tradeoff.
+  params:
+    voxel_size: 0.8
+    distance_threshold_factor: 2.0
+    ransac_n: 4
+    ransac_trials: 5
+    max_iteration: 100000
+    confidence: 0.999
+    gicp_max_iterations: 20
+    gicp_max_correspondence_distance_factor: 2.0
+    gicp_downsampling_resolution: 0.8
+    gicp_num_threads: 1
+    gicp_verbose: false
+    enable_refine: true

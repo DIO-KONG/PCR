@@ -15,3 +15,5 @@
 - 使用 small_gicp GICP 对最佳 coarse transform refine。
 - 输出仍为 source -> target。
 - 记录 `algorithm_coarse_time`、`algorithm_refine_time`，总算法耗时写入 `algorithm_time`。
+- 当前推荐参数来自 specified 实验：`voxel_size=0.8`、`distance_threshold_factor=2.0`、`ransac_trials=5`、`gicp_downsampling_resolution=0.8`。
+- 经验结论：best-of-5 GICP 比 single/best-of-3 更稳定；`coarse_voxel_size=0.8` 和 `gicp_voxel_size=0.8` 在当前数据上明显优于 0.6/1.0。

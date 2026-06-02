@@ -80,6 +80,19 @@ D:\coding\Anaconda\Scripts\conda.exe create -p .env python=3.10 -y
 - `ransac_only`：Open3D FPFH + RANSAC baseline，速度快、结构简单，适合作为粗配准和框架 smoke test。
 - `gicp_refine`：当前推荐主方案。默认执行 5 次 FPFH + RANSAC，选择最佳 coarse transform 后调用 small_gicp GICP refine，输出 refined source -> target 变换。
 
+当前推荐 `gicp_refine` 参数：
+
+```yaml
+voxel_size: 0.8
+distance_threshold_factor: 2.0
+ransac_trials: 5
+gicp_downsampling_resolution: 0.8
+gicp_max_iterations: 20
+gicp_max_correspondence_distance_factor: 2.0
+```
+
+该配置写入 `configs/gicp_refine.yaml`。specified 实验显示它在当前任务上比 `ransac_only` 和 single/best-of-3 变体更稳定，且精度更高。
+
 `gicp_refine` 关键算法内部指标：
 - `algorithm_ransac_trials`
 - `algorithm_best_trial`
@@ -92,6 +105,22 @@ D:\coding\Anaconda\Scripts\conda.exe create -p .env python=3.10 -y
 - `algorithm_gicp_num_inliers`
 - `algorithm_coarse_time`
 - `algorithm_refine_time`
+
+## gicp_refine Specified Experiments
+可直接运行：
+
+```bat
+.env\python.exe testbench\specified\gicp_refine\ablation.py --config configs\default.yaml --task data\tasks\pair_mission1.yaml
+.env\python.exe testbench\specified\gicp_refine\random_stability.py --config configs\default.yaml --task data\tasks\pair_mission1.yaml --repeats 3
+.env\python.exe testbench\specified\gicp_refine\parameter_robustness.py --config configs\default.yaml --task data\tasks\pair_mission1.yaml
+```
+
+输出位置：
+- `results/specified/gicp_refine/ablation/<run_id>/`
+- `results/specified/gicp_refine/random_stability/<run_id>/`
+- `results/specified/gicp_refine/parameter_robustness/<run_id>/`
+
+每个 run 包含 `metrics.csv`、`metrics.json`、`summary.md`、`report/summary.md`，成功结果还保存 matrix/cloud/overlay。
 
 ## 常用命令
 推荐使用根目录 bat 入口：
