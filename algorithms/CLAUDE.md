@@ -6,3 +6,5 @@
 - success 输出矩阵必须是 source -> target；failed/skipped 的 transformation 必须为 None。
 - 算法不保存文件、不写报告。
 - 算法内部指标写入 `algorithm_metrics`，最终报告字段使用 `algorithm_*` 前缀。
+- `gicp_refine` 使用 repeated FPFH+RANSAC coarse registration，然后用 small_gicp GICP refine；不得改变 source -> target 矩阵方向。
+- small_gicp 缺失时 `gicp_refine` 返回 `skipped`，reason 必须包含明确安装提示。

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict
 
 from algorithms.base import AlgorithmSpec
-from algorithms import ransac_only
+from algorithms import gicp_refine, ransac_only
 
 
 _REGISTRY: Dict[str, AlgorithmSpec] = {}
@@ -33,5 +33,14 @@ register(
         runner=ransac_only.run,
         description="Open3D FPFH + RANSAC feature matching baseline.",
         required_dependencies=("open3d", "numpy"),
+    )
+)
+
+register(
+    AlgorithmSpec(
+        name=gicp_refine.METHOD_NAME,
+        runner=gicp_refine.run,
+        description="Repeated Open3D FPFH+RANSAC coarse registration refined by small_gicp GICP.",
+        required_dependencies=("open3d", "small_gicp", "numpy"),
     )
 )

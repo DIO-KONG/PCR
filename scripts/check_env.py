@@ -8,8 +8,8 @@ from pathlib import Path
 
 
 REQUIRED = ("numpy", "yaml")
-OPTIONAL = ("open3d",)
-PIP_PACKAGES = {"yaml": "PyYAML", "numpy": "numpy", "open3d": "open3d"}
+OPTIONAL = ("open3d", "small_gicp")
+PIP_PACKAGES = {"yaml": "PyYAML", "numpy": "numpy", "open3d": "open3d", "small_gicp": "small-gicp"}
 
 
 def module_available(name: str) -> bool:

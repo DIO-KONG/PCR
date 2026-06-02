@@ -5,8 +5,9 @@ PCR 是一个 agent 友好的点云刚性配准项目骨架，用于 Unitree + R
 ## 实验计划
 - 第一阶段：建立统一项目结构、便携环境、任务配置、结果目录和算法注册机制。
 - 第二阶段：以 `ransac_only` 作为第一轮基线算法，验证 source -> target 矩阵方向、结果保存和指标报告。
-- 第三阶段：扩展多对一、多对多 workflow，支持 top-k 匹配、绑定结果和游离目标标记。
-- 第四阶段：增加指定算法实验、稳定性测试、参数 sweep 和人工结果解释文档。
+- 第三阶段：接入 `gicp_refine`，使用多次 FPFH+RANSAC coarse transform 作为 small_gicp GICP refine 初值，作为当前推荐主方案。
+- 第四阶段：扩展多对一、多对多 workflow，支持 top-k 匹配、绑定结果和游离目标标记。
+- 第五阶段：增加指定算法实验、稳定性测试、参数 sweep 和人工结果解释文档。
 
 ## 矩阵方向
 所有算法和结果必须使用统一方向：
@@ -64,6 +65,7 @@ D:\coding\Anaconda\Scripts\conda.exe create -p .env python=3.10 -y
 
 推荐依赖：
 - `open3d`：点云 IO、下采样、normal、FPFH、RANSAC 配准、可视化。`ransac_only` 实际运行需要它；缺失时算法返回 `skipped`。
+- `small-gicp`：`gicp_refine` 的 GICP refine 后端。`gicp_refine` 是当前推荐主方案；缺失时算法返回 `skipped`，并在 error 中写明安装命令。
 
 标准库依赖：
 - `argparse`、`csv`、`json`、`hashlib`、`pathlib`、`dataclasses`、`time` 等。
@@ -72,6 +74,24 @@ D:\coding\Anaconda\Scripts\conda.exe create -p .env python=3.10 -y
 - NumPy：BSD-3-Clause。
 - PyYAML：MIT。
 - Open3D：MIT。
+- small-gicp：MIT。
+
+## 算法
+- `ransac_only`：Open3D FPFH + RANSAC baseline，速度快、结构简单，适合作为粗配准和框架 smoke test。
+- `gicp_refine`：当前推荐主方案。默认执行 5 次 FPFH + RANSAC，选择最佳 coarse transform 后调用 small_gicp GICP refine，输出 refined source -> target 变换。
+
+`gicp_refine` 关键算法内部指标：
+- `algorithm_ransac_trials`
+- `algorithm_best_trial`
+- `algorithm_best_coarse_fitness`
+- `algorithm_best_coarse_inlier_rmse`
+- `algorithm_all_trials`
+- `algorithm_gicp_converged`
+- `algorithm_gicp_error`
+- `algorithm_gicp_iterations`
+- `algorithm_gicp_num_inliers`
+- `algorithm_coarse_time`
+- `algorithm_refine_time`
 
 ## 常用命令
 推荐使用根目录 bat 入口：
