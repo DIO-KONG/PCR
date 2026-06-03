@@ -79,6 +79,14 @@ D:\coding\Anaconda\Scripts\conda.exe create -p .env python=3.10 -y
 ## 算法
 - `ransac_only`：Open3D FPFH + RANSAC baseline，速度快、结构简单，适合作为粗配准和框架 smoke test。
 - `gicp_refine`：当前推荐主方案。默认执行 5 次 FPFH + RANSAC，选择最佳 coarse transform 后调用 small_gicp GICP refine，输出 refined source -> target 变换。
+- `multi_comb`：试验性算法，用于尺度不一致、局部畸变、地板曲面、远端上翘等极不理想数据的诊断。它会生成多个 coarse candidate，用 weighted score 择优，并可选 affine refine。
+
+`multi_comb` 的 affine 模式说明：
+- `affine_mode: none`：只输出最佳刚体 coarse transform。
+- `affine_mode: constrained`：允许 `R @ diag(sx, sy, sz) @ p_source + t`，只引入三个轴向 scale，不允许 shear。
+- `affine_mode: unconstrained`：允许一般 affine `A @ p_source + b`，仅用于几何拟合诊断，不能直接视为机器人刚体位姿。
+
+`multi_comb` 成功输出仍保持 source -> target 方向；但 affine 模式输出不是严格刚体位姿，报告中的 `algorithm_transform_type` 会明确标记。
 
 当前推荐 `gicp_refine` 参数：
 
@@ -121,6 +129,18 @@ gicp_max_correspondence_distance_factor: 2.0
 - `results/specified/gicp_refine/parameter_robustness/<run_id>/`
 
 每个 run 包含 `metrics.csv`、`metrics.json`、`summary.md`、`report/summary.md`，成功结果还保存 matrix/cloud/overlay。
+
+## multi_comb Specified Experiment
+批量一对一参数测试：
+
+```bat
+.env\python.exe testbench\specified\multi_comb\pair_batch_parameter_test.py --task data\tasks\pair_batch_incremental_world.yaml --config configs\multi_comb.yaml
+```
+
+输出位置：
+- `results/specified/multi_comb/pair_batch_parameter_test/<run_id>/`
+
+输出包含 `metrics.csv`、`metrics.json`、`summary.md`、`report/summary.md`、`report/visualization_commands.md`，成功结果保存 matrix/cloud/overlay。
 
 ## 常用命令
 推荐使用根目录 bat 入口：

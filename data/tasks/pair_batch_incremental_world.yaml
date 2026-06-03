@@ -1,0 +1,41 @@
+task:
+  id: pair_batch_incremental_world
+  type: pair_batch
+  description: Batch pairwise incremental-to-world registration tasks.
+
+pairs:
+  - id: pair_16_to_14
+    source:
+      id: incremental_16
+      path: data/raw/16/incremental.ply
+    target:
+      id: world_14
+      path: data/raw/14/world.ply
+  - id: pair_18_to_16
+    source:
+      id: incremental_18
+      path: data/raw/18/incremental.ply
+    target:
+      id: world_16
+      path: data/raw/16/world.ply
+  - id: pair_20_to_18
+    source:
+      id: incremental_20
+      path: data/raw/20/incremental.ply
+    target:
+      id: world_18
+      path: data/raw/18/world.ply
+  - id: pair_22_to_20
+    source:
+      id: incremental_22
+      path: data/raw/22/incremental.ply
+    target:
+      id: world_20
+      path: data/raw/20/world.ply
+
+algorithm:
+  name: multi_comb
+
+output:
+  category: specified
+  experiment: pair_batch_parameter_test

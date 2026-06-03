@@ -1,0 +1,60 @@
+project:
+  name: PCR
+  seed: 42
+
+paths:
+  raw_dir: data/raw
+  cache_dir: data/cache
+  results_dir: results
+
+preprocessing:
+  voxel_size: 0.8
+  remove_statistical_outlier:
+    enabled: true
+    nb_neighbors: 20
+    std_ratio: 2.0
+  normals:
+    radius_factor: 2.0
+    max_nn: 30
+  fpfh:
+    radius_factor: 5.0
+    max_nn: 100
+  roi:
+    enabled: false
+    min_bound: null
+    max_bound: null
+  cache:
+    enabled: true
+    dir: data/cache
+
+algorithm:
+  name: multi_comb
+  params:
+    voxel_size: 0.8
+    coarse_method: ransac
+    coarse_trials: 3
+    distance_threshold_factor: 2.0
+    ransac_n: 4
+    max_iteration: 100000
+    confidence: 0.999
+    affine_mode: none
+    scale_min: 0.8
+    scale_max: 1.2
+    scale_steps: 5
+    inlier_distance_factor: 2.0
+    score_weights:
+      w_fitness: 1.0
+      w_overlap: 0.5
+      w_rmse: 0.5
+      w_trimmed: 0.5
+      w_translation: 0.0
+
+metrics:
+  trimmed_ratio: 0.9
+  overlap_threshold: 1.0
+  orthogonality_tolerance: 1.0e-3
+
+output:
+  save_transformed_cloud: true
+  save_overlay_cloud: true
+  visualize: false

@@ -8,3 +8,4 @@
 - 算法内部指标写入 `algorithm_metrics`，最终报告字段使用 `algorithm_*` 前缀。
 - `gicp_refine` 使用 repeated FPFH+RANSAC coarse registration，然后用 small_gicp GICP refine；不得改变 source -> target 矩阵方向。
 - small_gicp 缺失时 `gicp_refine` 返回 `skipped`，reason 必须包含明确安装提示。
+- `multi_comb` 是试验性诊断算法，可输出 rigid、constrained_affine 或 unconstrained_affine。affine 结果必须明确标记 transform_type，不能被解释为机器人刚体位姿。
