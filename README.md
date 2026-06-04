@@ -81,6 +81,17 @@ D:\coding\Anaconda\Scripts\conda.exe create -p .env python=3.10 -y
 - `gicp_refine`：当前推荐主方案。默认执行 5 次 FPFH + RANSAC，选择最佳 coarse transform 后调用 small_gicp GICP refine，输出 refined source -> target 变换。
 - `multi_comb`：试验性算法，用于尺度不一致、局部畸变、地板曲面、远端上翘等极不理想数据的诊断。它会生成多个 coarse candidate，用 weighted score 择优，并可选 affine refine。
 
+`multi_comb` 当前支持融合前鲁棒配准诊断：
+- 多 coarse source：RANSAC、FGR。
+- 多参数扰动：voxel、distance factor、feature subset。
+- feature subset：all、non_floor、near_mid_only；high_curvature 已实现但默认不启用，避免百万级点云运行过慢。
+- SE(3) 去相关：按旋转差和平移差筛选 diverse top-k candidates。
+- top-k rigid refine：默认对 diverse top-3 使用 Open3D GICP refine。
+- weighted score：综合公共 evaluator、coverage、plane degeneracy、motion prior。
+- GO2/DA3 场景假设：机器人坐标系中 `-Y` 为高度方向，地面通常接近最大 Y。
+
+代码内默认值采用轻量 balanced profile，便于 standard benchmark 回归；完整鲁棒参数组合写在 `configs/multi_comb.yaml`，用于 specified/离线实验。
+
 `multi_comb` 的 affine 模式说明：
 - `affine_mode: none`：只输出最佳刚体 coarse transform。
 - `affine_mode: constrained`：允许 `R @ diag(sx, sy, sz) @ p_source + t`，只引入三个轴向 scale，不允许 shear。
@@ -135,12 +146,16 @@ gicp_max_correspondence_distance_factor: 2.0
 
 ```bat
 .env\python.exe testbench\specified\multi_comb\pair_batch_parameter_test.py --task data\tasks\pair_batch_incremental_world.yaml --config configs\multi_comb.yaml
+.env\python.exe testbench\specified\multi_comb\world16_to_world14_parameter_sweep.py --config configs\multi_comb.yaml
 ```
 
 输出位置：
 - `results/specified/multi_comb/pair_batch_parameter_test/<run_id>/`
+- `results/specified/multi_comb/world16_to_world14_parameter_sweep/<run_id>/`
 
 输出包含 `metrics.csv`、`metrics.json`、`summary.md`、`report/summary.md`、`report/visualization_commands.md`，成功结果保存 matrix/cloud/overlay。
+
+当前未实现地图融合；建议后续在独立分支/模块中加入 quality gate、pose graph、submap fusion，避免逐步贪心融合放大误差。
 
 ## 常用命令
 推荐使用根目录 bat 入口：

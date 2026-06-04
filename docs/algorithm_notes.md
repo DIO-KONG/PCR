@@ -23,3 +23,7 @@
 - coarse candidate 支持 Open3D RANSAC；FGR 在 Open3D API 可用时支持，否则单个 candidate 记录 failed。
 - weighted score 同时考虑 eval_fitness、eval_overlap_ratio、eval_inlier_rmse、eval_trimmed_mean_nn_dist 和 eval_translation_norm。
 - affine_mode 为 constrained/unconstrained 时输出不再是严格刚体位姿，仅用于几何拟合诊断。
+- 当前增强版还会计算 coverage_score、plane_degeneracy、motion_prior_error，并用这些指标辅助候选排序。
+- 默认生成多来源、多参数、多点子集 coarse candidates，并通过 SE(3) rotation/translation 去相关筛选 top-k refine candidates。
+- `non_floor` 利用机器人坐标约定：`-Y` 是高度，地面/低矮结构通常接近最大 Y。
+- `high_curvature` 子集已实现但默认不启用，适合后续离线实验。

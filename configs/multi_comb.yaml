@@ -7,6 +7,11 @@ paths:
   cache_dir: data/cache
   results_dir: results
 
+scene:
+  robot_frame_height_axis: "-y"
+  bbox_min: [-13.792, -5.263, -13.005]
+  bbox_max: [16.798, 0.157, 11.165]
+
 preprocessing:
   voxel_size: 0.8
   remove_statistical_outlier:
@@ -32,11 +37,32 @@ algorithm:
   params:
     voxel_size: 0.8
     coarse_method: ransac
+    coarse_methods:
+      - ransac
+      - fgr
     coarse_trials: 3
+    voxel_sizes:
+      - 0.8
+    distance_threshold_factors:
+      - 1.5
+      - 2.0
+      - 2.5
+    feature_subsets:
+      - all
+      - non_floor
+      - near_mid_only
     distance_threshold_factor: 2.0
     ransac_n: 4
     max_iteration: 100000
     confidence: 0.999
+    top_k_refine: 3
+    min_rotation_separation_deg: 5.0
+    min_translation_separation: 0.3
+    rigid_refine:
+      enabled: true
+      method: gicp
+      max_iterations: 20
+      max_correspondence_distance_factor: 1.5
     affine_mode: none
     scale_min: 0.8
     scale_max: 1.2
@@ -48,6 +74,20 @@ algorithm:
       w_rmse: 0.5
       w_trimmed: 0.5
       w_translation: 0.0
+      w_coverage: 0.8
+      w_degeneracy: 0.3
+      w_motion_prior: 0.3
+    filtering:
+      floor_band: 0.35
+      near_mid_radius: 10.0
+      curvature_knn: 20
+      curvature_quantile: 0.75
+      min_subset_points: 50
+    coverage:
+      coverage_grid_size: 1.0
+      coverage_max_bins_per_axis: 64
+    motion_prior:
+      enabled: false
 
 metrics:
   trimmed_ratio: 0.9

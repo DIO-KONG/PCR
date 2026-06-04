@@ -21,5 +21,9 @@
 
 当前包含：
 - `multi_comb/pair_batch_parameter_test.py`
+- `multi_comb/world16_to_world14_parameter_sweep.py`
 
 该实验读取 `data/tasks/pair_batch_incremental_world.yaml`，对每个 pair 测试 rigid、constrained affine、unconstrained affine 三种配置，并生成人工可视化命令列表。
+`world16_to_world14_parameter_sweep.py` 只跑 `data/raw/16/world.ply -> data/raw/14/world.ply`，用于覆盖式参数扫描。
+
+当前 `multi_comb` 只做融合前 pairwise 诊断，不更新地图，不做 pose graph。
