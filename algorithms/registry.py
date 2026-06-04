@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict
 
 from algorithms.base import AlgorithmSpec
-from algorithms import gicp_refine, multi_comb, ransac_only
+from algorithms import gicp_refine, multi_comb, ransac_all_no_refine, ransac_only
 
 
 _REGISTRY: Dict[str, AlgorithmSpec] = {}
@@ -50,6 +50,15 @@ register(
         name=multi_comb.METHOD_NAME,
         runner=multi_comb.run,
         description="Experimental multi-candidate coarse registration with optional affine diagnostic refine.",
+        required_dependencies=("open3d", "numpy"),
+    )
+)
+
+register(
+    AlgorithmSpec(
+        name=ransac_all_no_refine.METHOD_NAME,
+        runner=ransac_all_no_refine.run,
+        description="Extracted RANSAC/all-points coarse candidate family without rigid refine or affine correction.",
         required_dependencies=("open3d", "numpy"),
     )
 )

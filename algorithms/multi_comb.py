@@ -38,7 +38,15 @@ DEFAULT_PARAMS = {
     "scale_min": 0.8,
     "scale_max": 1.2,
     "scale_steps": 5,
+    "horizontal_scale_min": None,
+    "horizontal_scale_max": None,
+    "horizontal_scale_steps": None,
+    "vertical_scale_min": None,
+    "vertical_scale_max": None,
+    "vertical_scale_steps": None,
     "inlier_distance_factor": 2.0,
+    "affine_pair_distance_factor": 5.0,
+    "affine_trimmed_ratio": 0.7,
     "score_weights": {
         "w_fitness": 1.0,
         "w_overlap": 0.5,
@@ -476,6 +484,10 @@ def _affine_refine(source_pcd: Any, target_pcd: Any, coarse_transform: np.ndarra
     source_points, target_points = _nearest_inlier_pairs(source_pcd, target_pcd, coarse_transform, params)
     if len(source_points) < 4:
         raise RuntimeError("Not enough inlier correspondences for affine refine.")
+    if affine_mode == "uniform_scale":
+        return _uniform_scale_affine(source_points, target_points, coarse_transform, params)
+    if affine_mode == "horizontal_vertical_scale":
+        return _horizontal_vertical_affine(source_points, target_points, coarse_transform, params)
     if affine_mode == "constrained":
         return _constrained_affine(source_points, target_points, coarse_transform, params)
     if affine_mode == "unconstrained":
@@ -490,38 +502,101 @@ def _nearest_inlier_pairs(source_pcd: Any, target_pcd: Any, transform: np.ndarra
     transformed = (transform[:3, :3] @ source_points.T).T + transform[:3, 3]
     target_points = np.asarray(target_pcd.points, dtype=float)
     tree = o3d.geometry.KDTreeFlann(target_pcd)
-    max_dist = float(params["voxel_size"]) * float(params.get("inlier_distance_factor", 2.0))
-    src_pairs = []
-    tgt_pairs = []
+    max_dist = float(params["voxel_size"]) * float(params.get("affine_pair_distance_factor", params.get("inlier_distance_factor", 2.0)))
+    src_pairs: list[np.ndarray] = []
+    tgt_pairs: list[np.ndarray] = []
+    distances: list[float] = []
     for source_point, transformed_point in zip(source_points, transformed):
         count, idx, squared = tree.search_knn_vector_3d(transformed_point, 1)
-        if count and float(np.sqrt(squared[0])) <= max_dist:
+        distance = float(np.sqrt(squared[0])) if count else float("inf")
+        if count and distance <= max_dist:
             src_pairs.append(source_point)
             tgt_pairs.append(target_points[idx[0]])
-    return np.asarray(src_pairs, dtype=float), np.asarray(tgt_pairs, dtype=float)
+            distances.append(distance)
+    if not src_pairs:
+        return np.asarray(src_pairs, dtype=float), np.asarray(tgt_pairs, dtype=float)
+    order = np.argsort(np.asarray(distances, dtype=float))
+    keep_ratio = min(1.0, max(0.05, float(params.get("affine_trimmed_ratio", 0.7))))
+    keep_count = max(4, int(len(order) * keep_ratio))
+    keep = order[:keep_count]
+    return np.asarray(src_pairs, dtype=float)[keep], np.asarray(tgt_pairs, dtype=float)[keep]
+
+
+def _uniform_scale_affine(source_points: np.ndarray, target_points: np.ndarray, coarse_transform: np.ndarray, params: Mapping[str, Any]) -> tuple[np.ndarray, dict[str, float], str]:
+    scales = np.linspace(float(params["scale_min"]), float(params["scale_max"]), int(params["scale_steps"]))
+    best_transform, best_scale, _ = _grid_scaled_transform(
+        source_points,
+        target_points,
+        coarse_transform,
+        ({"sx": float(scale), "sy": float(scale), "sz": float(scale)} for scale in scales),
+        params,
+    )
+    return best_transform, best_scale, "uniform_scale_affine"
+
+
+def _horizontal_vertical_affine(source_points: np.ndarray, target_points: np.ndarray, coarse_transform: np.ndarray, params: Mapping[str, Any]) -> tuple[np.ndarray, dict[str, float], str]:
+    h_min = float(params.get("horizontal_scale_min") or params["scale_min"])
+    h_max = float(params.get("horizontal_scale_max") or params["scale_max"])
+    h_steps = int(params.get("horizontal_scale_steps") or params["scale_steps"])
+    v_min = float(params.get("vertical_scale_min") or params["scale_min"])
+    v_max = float(params.get("vertical_scale_max") or params["scale_max"])
+    v_steps = int(params.get("vertical_scale_steps") or params["scale_steps"])
+    horizontal_scales = np.linspace(h_min, h_max, h_steps)
+    vertical_scales = np.linspace(v_min, v_max, v_steps)
+    best_transform, best_scale, _ = _grid_scaled_transform(
+        source_points,
+        target_points,
+        coarse_transform,
+        ({"sx": float(h), "sy": float(v), "sz": float(h)} for h, v in itertools.product(horizontal_scales, vertical_scales)),
+        params,
+    )
+    return best_transform, best_scale, "horizontal_vertical_scale_affine"
 
 
 def _constrained_affine(source_points: np.ndarray, target_points: np.ndarray, coarse_transform: np.ndarray, params: Mapping[str, Any]) -> tuple[np.ndarray, dict[str, float], str]:
+    scales = np.linspace(float(params["scale_min"]), float(params["scale_max"]), int(params["scale_steps"]))
+    best_transform, best_scale, _ = _grid_scaled_transform(
+        source_points,
+        target_points,
+        coarse_transform,
+        ({"sx": float(sx), "sy": float(sy), "sz": float(sz)} for sx, sy, sz in itertools.product(scales, repeat=3)),
+        params,
+    )
+    return best_transform, best_scale, "constrained_affine"
+
+
+def _grid_scaled_transform(
+    source_points: np.ndarray,
+    target_points: np.ndarray,
+    coarse_transform: np.ndarray,
+    scale_candidates: Any,
+    params: Mapping[str, Any],
+) -> tuple[np.ndarray, dict[str, float], float]:
     rotation = coarse_transform[:3, :3]
     best_error = float("inf")
     best_transform = None
     best_scale = None
-    scales = np.linspace(float(params["scale_min"]), float(params["scale_max"]), int(params["scale_steps"]))
-    for sx, sy, sz in itertools.product(scales, repeat=3):
-        scale = np.diag([sx, sy, sz])
+    trim_ratio = min(1.0, max(0.05, float(params.get("affine_trimmed_ratio", 0.7))))
+    keep_count = max(4, int(len(source_points) * trim_ratio))
+    for scale_values in scale_candidates:
+        scale = np.diag([scale_values["sx"], scale_values["sy"], scale_values["sz"]])
         rotated_scaled = (rotation @ scale @ source_points.T).T
-        translation = np.mean(target_points - rotated_scaled, axis=0)
+        translation = np.median(target_points - rotated_scaled, axis=0)
         residual = rotated_scaled + translation - target_points
+        distances = np.linalg.norm(residual, axis=1)
+        keep = np.argsort(distances)[:keep_count]
+        translation = np.mean(target_points[keep] - rotated_scaled[keep], axis=0)
+        residual = rotated_scaled[keep] + translation - target_points[keep]
         error = float(np.mean(np.sum(residual * residual, axis=1)))
         if error < best_error:
             best_error = error
             best_transform = np.eye(4)
             best_transform[:3, :3] = rotation @ scale
             best_transform[:3, 3] = translation
-            best_scale = {"sx": float(sx), "sy": float(sy), "sz": float(sz)}
+            best_scale = dict(scale_values)
     if best_transform is None or best_scale is None:
         raise RuntimeError("Constrained affine grid search failed.")
-    return best_transform, best_scale, "constrained_affine"
+    return best_transform, best_scale, best_error
 
 
 def _unconstrained_affine(source_points: np.ndarray, target_points: np.ndarray) -> tuple[np.ndarray, None, str]:
