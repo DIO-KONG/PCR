@@ -9,3 +9,4 @@
 - `gicp_refine` 使用 repeated FPFH+RANSAC coarse registration，然后用 small_gicp GICP refine；不得改变 source -> target 矩阵方向。
 - small_gicp 缺失时 `gicp_refine` 返回 `skipped`，reason 必须包含明确安装提示。
 - `multi_comb` 是试验性诊断算法，可输出 rigid、constrained_affine 或 unconstrained_affine。affine 结果必须明确标记 transform_type，不能被解释为机器人刚体位姿。
+- 当前主方案 `fast_rotation_cluster_scale_vote` 位于 `testbench/specified/`，是融合前 pipeline，不应为了方便而塞入 algorithms/ 破坏统一 pairwise 算法接口。

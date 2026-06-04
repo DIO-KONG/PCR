@@ -1,13 +1,14 @@
 # PCR: Point Cloud Registration Benchmark
 
-PCR 是一个 agent 友好的点云刚性配准项目骨架，用于 Unitree + RealSense 室内场景的一对一、多对一、多对多配准实验。
+PCR 是一个 agent 友好的点云配准项目骨架，用于 Unitree GO2 + 深度点云室内场景的一对一、多对一、多对多配准实验。项目仍以 source -> target 矩阵方向为硬约束；在 DA3 点云存在尺度漂移、重影和相似平面时，允许 specified pipeline 输出带尺度补偿的几何校正候选，但必须明确标记它不等价于严格机器人 SE(3) 位姿。
 
 ## 实验计划
 - 第一阶段：建立统一项目结构、便携环境、任务配置、结果目录和算法注册机制。
 - 第二阶段：以 `ransac_only` 作为第一轮基线算法，验证 source -> target 矩阵方向、结果保存和指标报告。
-- 第三阶段：接入 `gicp_refine`，使用多次 FPFH+RANSAC coarse transform 作为 small_gicp GICP refine 初值，作为当前推荐主方案。
+- 第三阶段：接入 `gicp_refine`，使用多次 FPFH+RANSAC coarse transform 作为 small_gicp GICP refine 初值，作为尺度一致数据的推荐方案。
 - 第四阶段：扩展多对一、多对多 workflow，支持 top-k 匹配、绑定结果和游离目标标记。
 - 第五阶段：增加指定算法实验、稳定性测试、参数 sweep 和人工结果解释文档。
+- 第六阶段：针对 DA3 当前数据，将 `fast_rotation_cluster_scale_vote` 提升为融合前纯点云主方案，用重力约束 yaw、top-view 相关、尺度/平移投票替代易被重影吸偏的自由 GICP refine。
 
 ## 矩阵方向
 所有算法和结果必须使用统一方向：
@@ -64,8 +65,8 @@ D:\coding\Anaconda\Scripts\conda.exe create -p .env python=3.10 -y
 - `PyYAML`：读取配置和任务 YAML。
 
 推荐依赖：
-- `open3d`：点云 IO、下采样、normal、FPFH、RANSAC 配准、可视化。`ransac_only` 实际运行需要它；缺失时算法返回 `skipped`。
-- `small-gicp`：`gicp_refine` 的 GICP refine 后端。`gicp_refine` 是当前推荐主方案；缺失时算法返回 `skipped`，并在 error 中写明安装命令。
+- `open3d`：点云 IO、下采样、normal、FPFH、RANSAC 配准、top-view 方案中的点云处理和可视化。`ransac_only`、`gicp_refine`、`multi_comb` 及当前主方案都需要它。
+- `small-gicp`：`gicp_refine` 的 GICP refine 后端。`gicp_refine` 用于尺度一致数据；缺失时算法返回 `skipped`，并在 error 中写明安装命令。
 
 标准库依赖：
 - `argparse`、`csv`、`json`、`hashlib`、`pathlib`、`dataclasses`、`time` 等。
@@ -78,7 +79,7 @@ D:\coding\Anaconda\Scripts\conda.exe create -p .env python=3.10 -y
 
 ## 算法
 - `ransac_only`：Open3D FPFH + RANSAC baseline，速度快、结构简单，适合作为粗配准和框架 smoke test。
-- `gicp_refine`：当前推荐主方案。默认执行 5 次 FPFH + RANSAC，选择最佳 coarse transform 后调用 small_gicp GICP refine，输出 refined source -> target 变换。
+- `gicp_refine`：尺度一致数据的推荐刚体方案。默认执行 5 次 FPFH + RANSAC，选择最佳 coarse transform 后调用 small_gicp GICP refine，输出 refined source -> target 变换。
 - `multi_comb`：试验性算法，用于尺度不一致、局部畸变、地板曲面、远端上翘等极不理想数据的诊断。它会生成多个 coarse candidate，用 weighted score 择优，并可选 affine refine。
 
 `multi_comb` 当前支持融合前鲁棒配准诊断：
@@ -99,7 +100,70 @@ D:\coding\Anaconda\Scripts\conda.exe create -p .env python=3.10 -y
 
 `multi_comb` 成功输出仍保持 source -> target 方向；但 affine 模式输出不是严格刚体位姿，报告中的 `algorithm_transform_type` 会明确标记。
 
-当前推荐 `gicp_refine` 参数：
+## 当前主方案：fast_rotation_cluster_scale_vote
+
+当前数据来自 Depth Anything 3 点云，存在点数不一致、重影、尺度漂移、相似平面、远端上翘和曲面地板。实测中，自由 RANSAC/GICP 很容易被局部高 fitness 的错误重叠区域吸偏；视觉上正确的候选反而常常不是传统指标第一名。因此当前主方案不是单一 `algorithms/` 注册算法，而是 specified pipeline：
+
+```text
+top-view yaw/scale/translation coarse candidates
+-> rotation cluster
+-> per-cluster representative
+-> horizontal/vertical scale + translation vote
+-> bounded/no local refine
+-> visual check and fusion gate
+```
+
+入口：
+
+```bat
+.env\python.exe testbench\specified\multi_comb\fast_rotation_cluster_scale_vote.py --config configs\ransac_all_no_refine.yaml
+```
+
+核心假设：
+- 机器人坐标系中 `-Y` 为高度方向。
+- source 和 target 之间主要是 yaw、水平平移、有限高度偏移和 DA3 造成的尺度差异。
+- 当前阶段只做融合前配准候选，不更新地图，不做 pose graph，不把尺度补偿矩阵当作严格里程计。
+
+算法流程：
+- 预处理：读取 `data/raw/16/incremental.ply` 和 `data/raw/14/world.ply`，使用现有 cache/preprocessing 工具得到下采样点云。
+- top-view 候选：将点云投影到 XZ 平面，枚举 yaw 和水平尺度，用 2D 占据相关寻找水平平移峰值。
+- 候选保留：默认保留 top-view 前 200 个候选，避免正确方向族因局部重影分数偏低而被过早丢弃。
+- 旋转聚类：按旋转角差聚类，默认阈值 5 度。
+- 精筛代表：默认取前 27 个 rotation cluster 的代表进入尺度/平移投票，同时保留少量 top score 候选。
+- 尺度投票：在固定 yaw 方向附近，搜索 `R @ diag(sx, sy, sx)`，允许水平尺度和高度尺度不同。
+- 平移投票：对采样点的最近邻平移向量做 voxel voting，用中位数估计稳定平移。
+- refine 策略：默认关闭 GICP；只有在后续明确需要时才启用受限 GICP，避免重影和尺度错判把候选吸偏。
+- 排名：以 refine 后公共评估分数为主，而不是单纯 cluster 大小或 top-view peak。
+
+默认落地参数：
+
+```text
+candidate_mode = topview
+topview_candidates = 200
+top_clusters = 27
+top_score_candidates = 16
+max_refine_candidates = 27
+cluster_rotation_deg = 5.0
+horizontal_scale_range = 0.75 .. 1.20, steps=5
+vertical_scale_range = 0.70 .. 1.15, steps=4
+max_vote_points = 240
+gicp_max_iterations = 0
+```
+
+验收记录：
+- run：`results/specified/multi_comb/fast_rotation_cluster_scale_vote/fast_rotation_cluster_scale_vote_20260604_170042`
+- 内部 pipeline 总耗时：`5.770699s`
+- top1 落在人工确认的正确旋转族。
+- top3 中有两个正确旋转族候选。
+- 视觉检查显示方案基本正确，主要残余误差集中在高度方向，约 0.3m。
+
+结果解释：
+- `eval_det_R != 1` 或 `eval_orthogonality_error` 较大时，矩阵包含尺度补偿，不是严格 SE(3) 位姿。
+- `scale_values.sx/sz` 反映水平尺度补偿，`scale_values.sy` 反映高度尺度补偿。
+- 对当前数据，`eval_fitness` 很高仍可能是假阳性，必须结合 overlay 视觉检查、rotation family 和尺度合理性判断。
+- 当前推荐将该矩阵作为融合前几何校正候选；真正地图融合阶段仍需要 quality gate、pose graph 或 submap 策略，避免逐步贪心更新累积误差。
+
+`gicp_refine` 推荐刚体参数：
 
 ```yaml
 voxel_size: 0.8
@@ -110,7 +174,7 @@ gicp_max_iterations: 20
 gicp_max_correspondence_distance_factor: 2.0
 ```
 
-该配置写入 `configs/gicp_refine.yaml`。specified 实验显示它在当前任务上比 `ransac_only` 和 single/best-of-3 变体更稳定，且精度更高。
+该配置写入 `configs/gicp_refine.yaml`。specified 实验显示它在尺度一致/无明显重影任务上比 `ransac_only` 和 single/best-of-3 变体更稳定，且精度更高；但在当前 DA3 尺度漂移数据上，主方案以 `fast_rotation_cluster_scale_vote` 为准。
 
 `gicp_refine` 关键算法内部指标：
 - `algorithm_ransac_trials`
@@ -147,6 +211,7 @@ gicp_max_correspondence_distance_factor: 2.0
 ```bat
 .env\python.exe testbench\specified\multi_comb\pair_batch_parameter_test.py --task data\tasks\pair_batch_incremental_world.yaml --config configs\multi_comb.yaml
 .env\python.exe testbench\specified\multi_comb\world16_to_world14_parameter_sweep.py --config configs\multi_comb.yaml
+.env\python.exe testbench\specified\multi_comb\fast_rotation_cluster_scale_vote.py --config configs\ransac_all_no_refine.yaml
 ```
 
 输出位置：

@@ -6,3 +6,5 @@
 - 同一次 standard run 中所有算法共享 cloud/matrix/report/metrics 输出目录。
 - standard 负责聚合 metrics.csv、metrics.json 和 report/summary.md。
 - standard 输出必须包含 `algorithm_*`、`eval_*` 和时间字段，便于跨算法性能统计。
+- 当前主方案为 `specified/multi_comb/fast_rotation_cluster_scale_vote.py`，属于融合前 pipeline 实验，不属于 standard 注册算法扫描。
+- 该主方案允许输出尺度补偿矩阵，报告必须明确其不是严格 SE(3) 位姿。
