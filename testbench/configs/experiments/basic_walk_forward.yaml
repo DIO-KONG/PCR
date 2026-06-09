@@ -1,0 +1,4 @@
+name: basic_walk_forward
+dataset_config: testbench/configs/datasets/current_da3.yaml
+algorithm_config: testbench/configs/algorithms/topview_vote.yaml
+algorithm_overrides: {}

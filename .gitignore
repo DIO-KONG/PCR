@@ -13,6 +13,9 @@
 # ignore da3/data/cache
 da3/data/cache
 
+# ignore experiment outputs
+result
+
 # ignore images and pointclouds
 *.jpg
 *.jpeg
@@ -21,3 +24,6 @@ da3/data/cache
 
 *.ply
 *.npz
+
+# pycache
+__pycache__/

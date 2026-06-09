@@ -1,0 +1,47 @@
+name: topview_vote
+preprocess:
+  voxel_size: 0.10
+  sor_enabled: true
+  sor_nb_neighbors: 20
+  sor_std_ratio: 2.0
+  normal_radius_factor: 2.0
+  normal_max_nn: 30
+  fpfh_radius_factor: 5.0
+  fpfh_max_nn: 100
+registration:
+  topview_grid_resolution: 0.10
+  topview_padding: 1.0
+  topview_yaw_step_deg: 5.0
+  topview_scale_min: 0.50
+  topview_scale_max: 2.20
+  topview_scale_steps: 18
+  topview_candidates: 200
+  topview_peak_weight: 0.0008
+  cluster_rotation_deg: 5.0
+  top_clusters: 27
+  top_score_candidates: 16
+  max_refine_candidates: 27
+  horizontal_scale_min: 0.60
+  horizontal_scale_max: 1.80
+  horizontal_scale_steps: 7
+  vertical_scale_min: 0.70
+  vertical_scale_max: 1.30
+  vertical_scale_steps: 4
+  max_vote_points: 240
+  vote_pair_distance: 2.0
+  translation_vote_voxel: 0.15
+  min_vote_pairs: 10
+  min_vote_peak: 3
+  vote_trimmed_ratio: 0.7
+  eval_overlap_threshold: 0.35
+  eval_trimmed_ratio: 0.9
+gate:
+  min_fitness: 0.55
+  max_trimmed_mean_nn_dist: 0.35
+  min_scale: 0.45
+  max_scale: 2.30
+fusion:
+  fusion_voxel_size: 0.06
+  fusion_sor_enabled: false
+output:
+  top_candidates: 5

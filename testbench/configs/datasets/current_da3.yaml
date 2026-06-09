@@ -1,0 +1,22 @@
+name: current_da3
+root: .
+initial_world: da3/data/raw/pointcloud/batch_01_baseline_001-012.ply
+steps:
+  - name: world_013
+    source: da3/data/raw/pointcloud/batch_02_window_009-013.ply
+    output_world: world_013
+  - name: world_014
+    source: da3/data/raw/pointcloud/batch_03_window_010-014.ply
+    output_world: world_014
+  - name: world_015
+    source: da3/data/raw/pointcloud/batch_04_window_011-015.ply
+    output_world: world_015
+  - name: world_016
+    source: da3/data/raw/pointcloud/batch_05_window_012-016.ply
+    output_world: world_016
+  - name: world_017
+    source: da3/data/raw/pointcloud/batch_06_window_013-017.ply
+    output_world: world_017
+  - name: world_018
+    source: da3/data/raw/pointcloud/batch_07_window_014-018.ply
+    output_world: world_018

@@ -12,3 +12,8 @@ This project is a Depth Anything 3 processing workspace. Keep these invariants i
 - The default DA3 model is `depth-anything/DA3NESTED-GIANT-LARGE-1.1`.
 - CUDA is required for the default Nested model. If CUDA is unavailable, fail clearly instead of silently falling back to CPU.
 - Generated `.npz` and `.ply` files may be regenerated from the raw images and runner script.
+- Point-cloud registration utilities live under `utils/`.
+- Registration algorithms live under `algorithm/`.
+- Experiment runners and experiment configs live under `testbench/`.
+- Experiment outputs live under `result/` and should be treated as derived artifacts.
+- `da3/data/raw/pointcloud/` is read-only input for registration experiments.

@@ -1,0 +1,29 @@
+name: fpfh_ransac_icp
+preprocess:
+  voxel_size: 0.10
+  sor_enabled: true
+  sor_nb_neighbors: 20
+  sor_std_ratio: 2.0
+  normal_radius_factor: 2.0
+  normal_max_nn: 30
+  fpfh_radius_factor: 5.0
+  fpfh_max_nn: 100
+registration:
+  registration_voxel_size: 0.10
+  ransac_distance_factor: 1.5
+  ransac_max_iterations: 100000
+  ransac_confidence: 0.999
+  icp_distance_factor: 1.0
+  icp_max_iterations: 50
+  eval_overlap_threshold: 0.35
+  eval_trimmed_ratio: 0.9
+gate:
+  min_fitness: 0.55
+  max_trimmed_mean_nn_dist: 0.35
+  min_scale: 0.45
+  max_scale: 2.30
+fusion:
+  fusion_voxel_size: 0.06
+  fusion_sor_enabled: false
+output:
+  top_candidates: 1
