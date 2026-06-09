@@ -1,0 +1,23 @@
+# ignore .env files, which is a virtual environment
+.env
+
+# ignore .codex
+.codex
+
+# ignore .vscode
+.vscode
+
+# ignore .agent
+.agent
+
+# ignore da3/data/cache
+da3/data/cache
+
+# ignore images and pointclouds
+*.jpg
+*.jpeg
+*.png
+*.bmp
+
+*.ply
+*.npz
