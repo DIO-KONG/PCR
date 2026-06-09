@@ -12,6 +12,8 @@ from utils.types import Candidate, RegistrationResult
 
 
 def json_safe(value: Any) -> Any:
+    """把 numpy/path 等对象转换成 JSON/YAML 可写类型。"""
+
     if isinstance(value, np.ndarray):
         return value.tolist()
     if isinstance(value, np.generic):
@@ -26,6 +28,8 @@ def json_safe(value: Any) -> Any:
 
 
 def write_json(path: str | Path, payload: dict) -> None:
+    """写 JSON 文件，保留中文。"""
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
@@ -33,6 +37,8 @@ def write_json(path: str | Path, payload: dict) -> None:
 
 
 def write_yaml(path: str | Path, payload: dict) -> None:
+    """写 YAML 文件，用于保存 run_config 快照。"""
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
@@ -40,12 +46,16 @@ def write_yaml(path: str | Path, payload: dict) -> None:
 
 
 def write_matrix(path: str | Path, matrix: np.ndarray) -> None:
+    """以文本形式保存 4x4 变换矩阵。"""
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     np.savetxt(path, matrix, fmt="%.10f")
 
 
 def candidate_to_dict(candidate: Candidate) -> dict:
+    """把 Candidate 转成可序列化字典。"""
+
     return {
         "candidate_id": candidate.candidate_id,
         "coarse_score": candidate.coarse_score,
@@ -62,6 +72,8 @@ def candidate_to_dict(candidate: Candidate) -> dict:
 
 
 def write_top_candidates(path: str | Path, candidates: list[Candidate]) -> None:
+    """写 top candidates Markdown 表，便于人工比较候选。"""
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
@@ -95,6 +107,8 @@ def save_pair_outputs(
     source_raw,
     target_raw,
 ) -> None:
+    """保存一次 pairwise 注册的标准产物。"""
+
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     registered = clone_transform(source_raw, result.matrix)

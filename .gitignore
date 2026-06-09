@@ -10,6 +10,10 @@
 # ignore .agent
 .agent
 
+# ignore Python cache files
+__pycache__/
+*.pyc
+
 # ignore da3/data/cache
 da3/data/cache
 

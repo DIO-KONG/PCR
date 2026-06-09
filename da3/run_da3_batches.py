@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Run fixed Depth Anything 3 batches and export fused Open3D point clouds."""
+"""运行固定 Depth Anything 3 batch，并导出每个 batch 的融合点云。
+
+这个脚本只负责“从 RGB 图像生成 DA3 局部 batch 结果”，不负责跨 batch 配准。
+跨 batch 配准和建图实验由 `testbench/run_experiment.py` 驱动。
+"""
 
 from __future__ import annotations
 
@@ -20,6 +24,11 @@ FRAME_RE = re.compile(r"^(\d+)-rgb\.png$")
 
 @dataclass(frozen=True)
 class BatchSpec:
+    """一个 DA3 推理 batch 的定义。
+
+    `frames` 使用数字帧号，输出文件名由 `stem` 统一生成，避免字符串排序造成 10 排在 2 前面。
+    """
+
     index: int
     label: str
     frames: tuple[int, ...]
@@ -32,6 +41,11 @@ class BatchSpec:
 
 
 def build_batches() -> list[BatchSpec]:
+    """构造当前项目固定的 DA3 batch 列表。
+
+    baseline 使用 1..12 作为基准地图；后续窗口使用当前帧和前四步图像。
+    """
+
     return [
         BatchSpec(1, "baseline", tuple(range(1, 13))),
         BatchSpec(2, "window", tuple(range(9, 14))),
@@ -44,6 +58,8 @@ def build_batches() -> list[BatchSpec]:
 
 
 def discover_images(image_dir: Path) -> dict[int, Path]:
+    """按数字前缀发现输入图像，并校验当前必须存在 1..18。"""
+
     if not image_dir.exists():
         raise FileNotFoundError(f"Image directory does not exist: {image_dir}")
 
@@ -68,6 +84,11 @@ def discover_images(image_dir: Path) -> dict[int, Path]:
 
 
 def require_cuda() -> None:
+    """检查 CUDA。
+
+    默认 Nested 模型较重，项目约定不静默退回 CPU，避免长时间运行后得到低效或不一致结果。
+    """
+
     import torch
 
     if not torch.cuda.is_available():
@@ -78,6 +99,8 @@ def require_cuda() -> None:
 
 
 def load_model(model_name: str):
+    """加载 DA3 模型到 CUDA。"""
+
     import torch
     from depth_anything_3.api import DepthAnything3
 
@@ -89,6 +112,11 @@ def load_model(model_name: str):
 
 
 def extrinsics_to_4x4(extrinsics: np.ndarray) -> np.ndarray:
+    """把 DA3 外参统一成 4x4 齐次矩阵。
+
+    DA3 外参是 world-to-camera；生成点云时会取逆，把相机坐标点变换到 batch 局部 world。
+    """
+
     exts = np.asarray(extrinsics, dtype=np.float64)
     if exts.ndim != 3:
         raise ValueError(f"Expected extrinsics with 3 dims, got shape {exts.shape}")
@@ -101,6 +129,8 @@ def extrinsics_to_4x4(extrinsics: np.ndarray) -> np.ndarray:
 
 
 def prediction_to_arrays(prediction) -> dict[str, np.ndarray]:
+    """把 DA3 Prediction 对象转换成 numpy 字典，便于保存 NPZ 和生成点云。"""
+
     arrays = {
         "depth": np.asarray(prediction.depth),
         "extrinsics": extrinsics_to_4x4(np.asarray(prediction.extrinsics)),
@@ -118,6 +148,8 @@ def save_prediction_npz(
     image_paths: Iterable[Path],
     arrays: dict[str, np.ndarray],
 ) -> None:
+    """保存 batch 的深度、置信度、内参、外参和处理后图像。"""
+
     payload = {
         "image_names": np.asarray([path.name for path in image_paths]),
         "depth": arrays["depth"],
@@ -139,6 +171,14 @@ def depth_to_world_points(
     conf_percentile: float,
     stride: int,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """把单张深度图反投影成 batch 局部 world 坐标系下的 3D 点。
+
+    反投影流程：
+    1. 用内参把像素 + depth 转成 camera 坐标。
+    2. 取 DA3 world-to-camera 外参的逆，得到 camera-to-world。
+    3. 把 camera 点变换到 batch 局部 world。
+    """
+
     if depth.ndim != 2:
         raise ValueError(f"Expected a 2D depth map, got {depth.shape}")
     if image.shape[:2] != depth.shape:
@@ -180,6 +220,11 @@ def make_point_cloud(
     stride: int,
     voxel_size: float,
 ) -> tuple[object, int, int]:
+    """把一个 batch 的多视角深度融合成 Open3D 点云。
+
+    当前融合只发生在 DA3 batch 内部。跨 batch 的重影过滤和建图由 testbench 处理。
+    """
+
     import open3d as o3d
 
     depth = arrays["depth"]
@@ -222,6 +267,8 @@ def make_point_cloud(
 
 
 def run(args: argparse.Namespace) -> None:
+    """脚本主流程。"""
+
     image_dir = args.image_dir
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -272,13 +319,15 @@ def run(args: argparse.Namespace) -> None:
 
 
 def parse_args() -> argparse.Namespace:
+    """解析命令行参数。"""
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image-dir", type=Path, default=DEFAULT_IMAGE_DIR)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--process-res", type=int, default=504)
     parser.add_argument("--process-res-method", default="upper_bound_resize")
-    parser.add_argument("--conf-percentile", type=float, default=40.0)
+    parser.add_argument("--conf-percentile", type=float, default=20.0)
     parser.add_argument("--point-stride", type=int, default=1)
     parser.add_argument("--voxel-size", type=float, default=0.01)
     parser.add_argument("--dry-run", action="store_true", help="Validate image discovery and batches only.")

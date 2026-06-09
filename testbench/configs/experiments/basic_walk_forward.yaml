@@ -2,3 +2,22 @@ name: basic_walk_forward
 dataset_config: testbench/configs/datasets/current_da3.yaml
 algorithm_config: testbench/configs/algorithms/topview_vote.yaml
 algorithm_overrides: {}
+fusion_sweeps:
+  - name: conflict_strict
+    fusion_method: conflict_filter
+    fusion_voxel_size: 0.06
+    duplicate_distance: 0.04
+    conflict_distance: 0.12
+    output_debug_clouds: true
+  - name: conflict_balanced
+    fusion_method: conflict_filter
+    fusion_voxel_size: 0.06
+    duplicate_distance: 0.06
+    conflict_distance: 0.18
+    output_debug_clouds: true
+  - name: conflict_loose
+    fusion_method: conflict_filter
+    fusion_voxel_size: 0.06
+    duplicate_distance: 0.08
+    conflict_distance: 0.25
+    output_debug_clouds: true

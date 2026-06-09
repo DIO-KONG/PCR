@@ -7,6 +7,12 @@ import open3d as o3d
 
 @dataclass
 class PreparedCloud:
+    """预处理后的点云集合。
+
+    `raw` 保留原始点云用于最终 transform/overlay；
+    `down` 用于注册和指标评估，避免在全量点上做昂贵搜索。
+    """
+
     raw: o3d.geometry.PointCloud
     working: o3d.geometry.PointCloud
     down: o3d.geometry.PointCloud
@@ -19,6 +25,12 @@ def prepare_point_cloud(
     *,
     compute_fpfh: bool = False,
 ) -> PreparedCloud:
+    """点云预处理。
+
+    当前流程：可选 SOR 去离群点 -> 体素降采样 -> 法线估计 -> 可选 FPFH。
+    topview_vote 不需要 FPFH，RANSAC 对照算法需要。
+    """
+
     working = cloud
     if config.get("sor_enabled", True):
         working, _ = working.remove_statistical_outlier(

@@ -41,7 +41,11 @@ gate:
   min_scale: 0.45
   max_scale: 2.30
 fusion:
+  fusion_method: conflict_filter
   fusion_voxel_size: 0.06
+  duplicate_distance: 0.06
+  conflict_distance: 0.18
   fusion_sor_enabled: false
+  output_debug_clouds: true
 output:
   top_candidates: 5

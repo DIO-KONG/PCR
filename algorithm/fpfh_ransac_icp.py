@@ -12,6 +12,12 @@ from utils.types import Candidate, RegistrationResult
 
 
 def register(source_path: str | Path, target_path: str | Path, config: dict) -> RegistrationResult:
+    """Open3D FPFH + RANSAC + ICP 对照算法。
+
+    该算法主要用于 benchmark/sanity check。它输出严格刚体矩阵，
+    但在 DA3 ghosting、尺度漂移和重复平面场景下可能不如 topview_vote 稳定。
+    """
+
     source_path = Path(source_path)
     target_path = Path(target_path)
     source_raw = read_point_cloud(source_path)

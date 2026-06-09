@@ -134,6 +134,40 @@ depth-anything/DA3NESTED-GIANT-LARGE-1.1
 
 实验框架不使用 DA3 外参作为配准初值。当前 v1 只基于 `.ply` 点云几何做基础配准。
 
+### 代码注释要求
+
+所有项目代码都需要有详细中文注释。注释重点不是逐行翻译语法，而是解释：
+
+- 该模块在建图流程中的职责。
+- 几何假设，例如矩阵方向、坐标轴、尺度含义。
+- 配准、融合、指标计算中的关键阈值为什么存在。
+- 非显然逻辑，例如 top-view 候选生成、translation voting、重影过滤。
+- 未来维护者调参时应该注意的风险。
+
+### 融合方案路线
+
+当前仅实现“重影检测 / 冲突过滤”，后续可以按效果逐步升级：
+
+1. Voxel / Hash Map 融合
+   - 每个 voxel 维护一个稳定代表点、颜色、观测次数和权重。
+   - 新点进入已有 voxel 时做加权更新，而不是无限追加点。
+   - 目标是保持密度不随观测次数膨胀。
+2. 重影检测 / 冲突过滤
+   - 当前已实现。
+   - 配准后，将 source 点变换到当前 world 坐标系。
+   - 如果 source 点到地图最近邻距离低于 `duplicate_distance`，认为地图中已经存在该表面，丢弃以保持密度稳定。
+   - 如果距离介于 `duplicate_distance` 和 `conflict_distance` 之间，认为它靠近已有表面但未对齐，作为潜在重影丢弃。
+   - 如果距离高于 `conflict_distance`，认为它可能是新增区域，允许单独加入地图。
+   - 类似地，`9..13` 的点云经过配准得到变换后，可以检测其新增部分是否已存在于地图中；若新增区域与地图距离高于阈值，则按该变换单独加入对应新区域。
+3. Surfel 融合
+   - 如果“重影检测 / 冲突过滤”效果不理想，再考虑。
+   - 每个 surfel 维护 position、normal、color、radius、confidence、timestamp。
+   - 适合更细粒度地处理重复观测、法线冲突和局部表面更新。
+4. Pose Graph / Submap，而不是立即硬融合
+   - 如果地图变大或长序列累计漂移明显，应优先保留 submap 和 transform。
+   - 先做子图级约束和全局优化，再统一导出地图。
+   - 这样可以避免某一步错误融合污染后续所有 world。
+
 ### 当前数据集
 
 数据集配置：
@@ -291,10 +325,14 @@ result/walk_forward_topview_smoke/
 
 - `matrix.txt`：source 到 target/world 的 4x4 变换。
 - `metrics.json`：指标、状态、top candidates。
+- `fusion_stats.json`：融合阶段的重复点、冲突点、新增点统计。
 - `registered_source.ply`：变换后的 source。
 - `overlay_top1.ply`：target/world 灰色，source 黄色。
 - `top_candidates.md`：候选排名表。
 - `fused_world.ply`：walk-forward 模式下的融合地图。
+- `fusion_debug/accepted_new_points.ply`：通过冲突过滤后真正加入地图的新点。
+- `fusion_debug/rejected_conflict_points.ply`：被判定为潜在重影冲突并丢弃的点。
+- `fusion_debug/duplicate_points.ply`：被判定为地图中已有表面的重复点。
 
 ## 结果怎么看
 
@@ -341,6 +379,30 @@ algorithm_overrides:
   fusion:
     fusion_voxel_size: 0.05
 ```
+
+### 多组融合参数 sweep
+
+当前实验配置提供了 `fusion_sweeps`，用于一次运行多组“重影检测 / 冲突过滤”阈值：
+
+```bash
+.env/bin/python testbench/run_experiment.py \
+  --mode fusion_sweep \
+  --run-name fusion_conflict_sweep \
+  --overwrite
+```
+
+输出结构：
+
+```text
+result/fusion_conflict_sweep/
+├── 01_conflict_strict/
+├── 02_conflict_balanced/
+├── 03_conflict_loose/
+├── summary.json
+└── summary.md
+```
+
+每个子目录都有自己的 `final_world.ply`，用于可视化择优。
 
 ## 新增数据集
 

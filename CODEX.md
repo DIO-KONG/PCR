@@ -17,3 +17,5 @@ This project is a Depth Anything 3 processing workspace. Keep these invariants i
 - Experiment runners and experiment configs live under `testbench/`.
 - Experiment outputs live under `result/` and should be treated as derived artifacts.
 - `da3/data/raw/pointcloud/` is read-only input for registration experiments.
+- All project code should include detailed Chinese comments explaining intent, key assumptions, and non-obvious geometry logic.
+- Current fusion implementation focuses on ghost detection / conflict filtering. Voxel/hash-map fusion, surfel fusion, and pose-graph/submap fusion are future extension directions.
