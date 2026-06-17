@@ -6,3 +6,9 @@ __pycache__/
 
 # generated experiment / preprocessing outputs
 result/
+
+# image and point clouds
+*.jpg
+*.png
+*.ply
+*.npz
