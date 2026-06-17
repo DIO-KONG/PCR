@@ -1,0 +1,3 @@
+name: current_da3
+source: da3/data/raw/pointcloud/batch_02_window_009-013.ply
+target: da3/data/raw/pointcloud/batch_01_baseline_001-012.ply
