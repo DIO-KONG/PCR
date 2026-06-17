@@ -38,7 +38,7 @@ DA3 不同 batch 之间可能存在轻微尺度差异，例如 5% 左右。但�
 
 ## 关键参数
 
-`sampling.conf_percentile` 表示丢弃低置信度像素的百分位。当前为 `5.0`，即保留前 95% 置信度点。
+`sampling.conf_percentile` 表示丢弃低置信度像素的百分位。当前 walk-forward 配置为 `20.0`，即保留较高置信度的 80% 像素点。参数 sweep 中仍会测试 `0/5/10/20`，用于观察采样密度和噪声之间的权衡。
 
 `ransac.thresholds` 是粗候选生成阈值。当前为：
 
@@ -105,6 +105,16 @@ testbench/sweep_shared_frame_alignment.py
 - 将相邻 batch 刚体变换组合到 global 坐标系。
 - 以累计 world 为 target 做有边界 point-to-plane ICP。
 - ICP 在 `0.15m / 5deg` 边界内即采用；共享帧一致性只记录为诊断，不作为拒绝条件。
+
+当前实现已经拆到新的 `pcr/` 架构中：
+
+- `pcr.algorithms.shared_frame.frame_selection`：动态共享帧发现、4选3、候选排序。
+- `pcr.algorithms.refinement.icp`：有边界 point-to-plane ICP。
+- `pcr.pipeline.registration_step`：单步 coarse + ICP 编排。
+- `pcr.state.world`：累计 world 和 batch 到 global 的 transform graph。
+- `pcr.artifacts.store`：矩阵、overlay、metrics、summary 写入。
+
+旧入口 `testbench/run_shared_frame_walkforward.py` 只保留命令兼容，不再承载算法细节。
 
 固定参数为：
 

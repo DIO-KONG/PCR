@@ -68,7 +68,20 @@ result/preprocess/batch_01_baseline_001-012/debug/
 
 ## 点云配准框架
 
-当前框架把通用工具放在 `utils/`，配准算法放在 `algorithm/`，实验入口和配置放在 `testbench/`。
+当前框架已经开始迁移到长期维护结构：核心代码放在 `pcr/`，旧的
+`testbench/` 继续保留为实验配置和兼容 CLI。
+
+主要职责边界：
+
+- `pcr/domain/`：稳定数据模型，尤其是带 source/target 的 `Transform`。
+- `pcr/algorithms/`：共享帧粗配准、bounded ICP 等数值算法。
+- `pcr/pipeline/`：单步配准和 walk-forward sequence 编排。
+- `pcr/state/`：累计 world、batch 到 global 的 transform graph、融合策略。
+- `pcr/artifacts/`：PLY、矩阵、JSON、Markdown 输出。
+- `testbench/configs/`：实验配置。
+
+旧命令仍然可用，但 `testbench/run_shared_frame_walkforward.py` 现在只是薄入口，
+实际执行转入 `pcr.app.run_walkforward`。架构细节见 `pcr/README.md`。
 
 当前已实现第一个可控算法 `shared_frame_alignment`。它不是传统点云特征配准，而是利用 DA3 batch 之间共享 RGB-D 帧的同像素 3D 对应关系，估计 window batch 到 baseline batch 的刚体变换。当前实现保持刚体配准，不做 Sim(3) 尺度微调。
 
@@ -83,12 +96,12 @@ result/preprocess/batch_01_baseline_001-012/debug/
   --overwrite
 ```
 
-后续新增算法时需要：
+后续新增算法时建议：
 
-1. 在 `algorithm/` 下新增算法实现。
-2. 在 `algorithm/registry.py` 中注册算法名。
+1. 优先在 `pcr/algorithms/` 下新增可导入算法组件。
+2. 若是正式 pipeline 算法，在 `pcr/pipeline/` 中通过明确接口调用。
 3. 在 `testbench/configs/algorithms/` 下新增对应 YAML。
-4. 在 `testbench/configs/experiments/registration_schemes.yaml` 的 `schemes` 中加入该 YAML 路径。
+4. 若需要 CLI，新增或扩展 `pcr/app/`，再让 `testbench/run_*.py` 作为薄 wrapper 转调。
 
 默认输入为：
 
@@ -183,6 +196,19 @@ summary.json
 - 将 source 投到累计 world 后，对累计 world 做 bounded point-to-plane ICP。
 - ICP 在 `0.15m / 5deg` 内即采用，否则回退 coarse。
 - 每步融合进累计 world，并保存最终 `final_world.ply`。
+
+内部执行已拆分为：
+
+```text
+pcr.app.run_walkforward
+  -> pcr.config.loader
+  -> pcr.pipeline.SequencePipeline
+  -> pcr.pipeline.RegistrationStepPipeline
+  -> pcr.state.WorldState
+  -> pcr.artifacts.ArtifactStore
+```
+
+顶层 CLI 不再直接保存矩阵、拼 JSON、运行 RANSAC 或更新 world。
 
 输出位于：
 
