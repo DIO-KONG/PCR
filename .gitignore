@@ -3,3 +3,6 @@
 
 # cache
 __pycache__/
+
+# generated experiment / preprocessing outputs
+result/
