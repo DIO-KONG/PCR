@@ -17,7 +17,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from algorithm.registry import get_algorithm
-from algorithm.common import prepare_clouds
 from utils.pointcloud import load_cloud, make_overlay, save_cloud, transform_cloud
 
 
@@ -80,6 +79,32 @@ def make_run_dir(result_root: Path, run_name: str | None, overwrite: bool) -> Pa
 def save_candidate_table(path: Path, result) -> None:
     """保存 top candidates Markdown 表。"""
 
+    if result.algorithm == "shared_frame_alignment":
+        lines = [
+            "| rank | candidate | coarse_threshold | score | status | inlier_ratio | inliers | median_error | p90_error | icp_status | method |",
+            "|---:|---:|---:|---:|---|---:|---:|---:|---:|---|---|",
+        ]
+        for rank, candidate in enumerate(result.candidates, 1):
+            metrics = candidate.metrics
+            icp = metrics.get("icp_refinement") or {}
+            lines.append(
+                "| {rank} | {cid} | {coarse:.3f} | {score:.6f} | {status} | {ratio:.6f} | {inliers} | {median:.6f} | {p90:.6f} | {icp_status} | {method} |".format(
+                    rank=rank,
+                    cid=candidate.candidate_id,
+                    coarse=float(metrics.get("coarse_threshold") or 0.0),
+                    score=float(candidate.score),
+                    status=metrics.get("status", ""),
+                    ratio=float(metrics.get("inlier_ratio") or 0.0),
+                    inliers=int(metrics.get("inlier_count") or 0),
+                    median=float(metrics.get("median_error") or 999.0),
+                    p90=float(metrics.get("p90_error") or 999.0),
+                    icp_status=icp.get("status", ""),
+                    method=candidate.metadata.get("method", ""),
+                )
+            )
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return
+
     lines = [
         "| rank | candidate | score | status | src_fit | bidir_fit | trimmed | method |",
         "|---:|---:|---:|---|---:|---:|---:|---|",
@@ -104,9 +129,12 @@ def save_candidate_table(path: Path, result) -> None:
 def save_scheme_outputs(output_dir: Path, result, source_path: Path, target_path: Path, config: dict) -> dict:
     """保存单个算法方案输出。"""
 
-    source_prepared, target_prepared = prepare_clouds(load_cloud(source_path), load_cloud(target_path), config)
-    registered = transform_cloud(source_prepared, result.matrix)
-    overlay = make_overlay(target_prepared, registered)
+    source_cloud_path = Path(config.get("source_cloud", source_path))
+    target_cloud_path = Path(config.get("target_cloud", target_path))
+    source = load_cloud(source_cloud_path)
+    target = load_cloud(target_cloud_path)
+    registered = transform_cloud(source, result.matrix)
+    overlay = make_overlay(target, registered)
 
     write_matrix(output_dir / "matrix.txt", result.matrix)
     write_json(
@@ -117,13 +145,15 @@ def save_scheme_outputs(output_dir: Path, result, source_path: Path, target_path
             "message": result.message,
             "source": source_path,
             "target": target_path,
+            "source_cloud": source_cloud_path,
+            "target_cloud": target_cloud_path,
             "metrics": result.metrics,
             "candidates": result.candidates,
         },
     )
     save_candidate_table(output_dir / "top_candidates.md", result)
-    save_cloud(output_dir / "registered_source_preprocessed.ply", registered)
-    save_cloud(output_dir / "overlay_preprocessed.ply", overlay)
+    save_cloud(output_dir / "registered_source.ply", registered)
+    save_cloud(output_dir / "overlay.ply", overlay)
     return {
         "algorithm": result.algorithm,
         "status": result.status,

@@ -2,7 +2,4 @@ name: registration_schemes
 dataset_config: testbench/configs/datasets/current_da3.yaml
 result_root: result/registration_schemes
 schemes:
-  - testbench/configs/algorithms/fpfh_ransac.yaml
-  - testbench/configs/algorithms/fpfh_ransac_icp.yaml
-  - testbench/configs/algorithms/fpfh_colored_icp.yaml
-  - testbench/configs/algorithms/teaser_icp.yaml
+  - testbench/configs/algorithms/shared_frame_alignment.yaml

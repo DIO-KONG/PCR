@@ -1,14 +1,59 @@
-# .env folder
-.env
+# Python virtual environments
+.env/
+.venv/
+venv/
+env/
 
-# cache
+# Python cache / build artifacts
 __pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
 
-# generated experiment / preprocessing outputs
+# Jupyter / notebooks runtime
+.ipynb_checkpoints/
+
+# Project generated outputs
 result/
+outputs/
+runs/
+logs/
+*.log
 
-# image and point clouds
-*.jpg
-*.png
-*.ply
-*.npz
+# DA3 generated data artifacts
+da3/data/raw/pointcloud/*.ply
+da3/data/raw/pointcloud/*.npz
+da3/data/cache/
+
+# Optional third-party source/build dependencies
+dependencies/
+
+# Large point-cloud / model artifacts outside DA3 raw outputs
+*.pcd
+*.las
+*.laz
+*.e57
+*.obj
+*.glb
+*.gltf
+*.ckpt
+*.pth
+*.pt
+*.safetensors
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

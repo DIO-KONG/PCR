@@ -1,0 +1,49 @@
+name: shared_frame_alignment
+source_npz: da3/data/raw/pointcloud/batch_02_window_009-013.npz
+target_npz: da3/data/raw/pointcloud/batch_01_baseline_001-012.npz
+source_cloud: result/preprocess/batch_02_window_009-013/floor_removed.ply
+target_cloud: result/preprocess/batch_01_baseline_001-012/floor_removed.ply
+shared_frames:
+  - 9-rgb.png
+  - 10-rgb.png
+  - 11-rgb.png
+  - 12-rgb.png
+sampling:
+  stride: 6
+  conf_percentile: 5.0
+  max_points_per_frame: 8000
+  random_seed: 7
+ransac:
+  iterations: 3000
+  sample_size: 6
+  thresholds:
+    - 0.12
+    - 0.10
+    - 0.08
+    - 0.06
+  evaluation_threshold: 0.06
+  min_inlier_ratio: 0.35
+  min_inliers: 50
+  seed: 7
+refinement:
+  enabled: true
+  thresholds:
+    - 0.12
+    - 0.10
+    - 0.08
+    - 0.06
+  iterations_per_threshold: 2
+  min_points: 200
+icp_refinement:
+  enabled: true
+  voxel_size: 0.06
+  max_correspondence_distance: 0.08
+  normal_radius: 0.18
+  normal_max_nn: 30
+  max_iteration: 40
+  max_translation_delta: 0.15
+  max_rotation_delta_deg: 5.0
+  max_shared_median_error_ratio: 1.10
+  min_shared_inlier_ratio_ratio: 0.85
+output:
+  top_k: 4
