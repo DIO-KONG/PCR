@@ -1,0 +1,93 @@
+name: shared_frame_dynamic_top3_walkforward
+result_root: result/walkforward_shared_frame
+raw_pointcloud_dir: da3/data/raw/pointcloud
+preprocess_root: result/preprocess
+baseline:
+  id: batch_01_baseline_001-012
+  npz: da3/data/raw/pointcloud/batch_01_baseline_001-012.npz
+  raw_cloud: da3/data/raw/pointcloud/batch_01_baseline_001-012.ply
+  cloud: result/preprocess/batch_01_baseline_001-012/floor_removed.ply
+steps:
+  - id: step_01_batch_02_to_batch_01
+    source_id: batch_02_window_009-013
+    target_id: batch_01_baseline_001-012
+    source_npz: da3/data/raw/pointcloud/batch_02_window_009-013.npz
+    target_npz: da3/data/raw/pointcloud/batch_01_baseline_001-012.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_02_window_009-013.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_01_baseline_001-012.ply
+    source_cloud: result/preprocess/batch_02_window_009-013/floor_removed.ply
+    target_cloud: result/preprocess/batch_01_baseline_001-012/floor_removed.ply
+  - id: step_02_batch_03_to_batch_02
+    source_id: batch_03_window_010-014
+    target_id: batch_02_window_009-013
+    source_npz: da3/data/raw/pointcloud/batch_03_window_010-014.npz
+    target_npz: da3/data/raw/pointcloud/batch_02_window_009-013.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_03_window_010-014.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_02_window_009-013.ply
+    source_cloud: result/preprocess/batch_03_window_010-014/floor_removed.ply
+    target_cloud: result/preprocess/batch_02_window_009-013/floor_removed.ply
+  - id: step_03_batch_04_to_batch_03
+    source_id: batch_04_window_011-015
+    target_id: batch_03_window_010-014
+    source_npz: da3/data/raw/pointcloud/batch_04_window_011-015.npz
+    target_npz: da3/data/raw/pointcloud/batch_03_window_010-014.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_04_window_011-015.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_03_window_010-014.ply
+    source_cloud: result/preprocess/batch_04_window_011-015/floor_removed.ply
+    target_cloud: result/preprocess/batch_03_window_010-014/floor_removed.ply
+  - id: step_04_batch_05_to_batch_04
+    source_id: batch_05_window_012-016
+    target_id: batch_04_window_011-015
+    source_npz: da3/data/raw/pointcloud/batch_05_window_012-016.npz
+    target_npz: da3/data/raw/pointcloud/batch_04_window_011-015.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_05_window_012-016.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_04_window_011-015.ply
+    source_cloud: result/preprocess/batch_05_window_012-016/floor_removed.ply
+    target_cloud: result/preprocess/batch_04_window_011-015/floor_removed.ply
+  - id: step_05_batch_06_to_batch_05
+    source_id: batch_06_window_013-017
+    target_id: batch_05_window_012-016
+    source_npz: da3/data/raw/pointcloud/batch_06_window_013-017.npz
+    target_npz: da3/data/raw/pointcloud/batch_05_window_012-016.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_06_window_013-017.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_05_window_012-016.ply
+    source_cloud: result/preprocess/batch_06_window_013-017/floor_removed.ply
+    target_cloud: result/preprocess/batch_05_window_012-016/floor_removed.ply
+  - id: step_06_batch_07_to_batch_06
+    source_id: batch_07_window_014-018
+    target_id: batch_06_window_013-017
+    source_npz: da3/data/raw/pointcloud/batch_07_window_014-018.npz
+    target_npz: da3/data/raw/pointcloud/batch_06_window_013-017.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_07_window_014-018.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_06_window_013-017.ply
+    source_cloud: result/preprocess/batch_07_window_014-018/floor_removed.ply
+    target_cloud: result/preprocess/batch_06_window_013-017/floor_removed.ply
+algorithm:
+  frame_combo_size: 3
+  sampling:
+    conf_percentile: 20.0
+    stride: 6
+    max_points_per_frame: 8000
+    random_seed: 7
+  ransac:
+    iterations: 3000
+    sample_size: 6
+    thresholds: [0.18, 0.14, 0.10, 0.06]
+    evaluation_threshold: 0.06
+    min_inliers: 50
+    seed: 7
+  refinement:
+    enabled: true
+    thresholds: [0.18, 0.14, 0.10, 0.06]
+    iterations_per_threshold: 2
+    min_points: 200
+  icp:
+    voxel_size: 0.06
+    max_correspondence_distance: 0.08
+    normal_radius: 0.18
+    normal_max_nn: 30
+    max_iteration: 40
+    max_translation_delta: 0.15
+    max_rotation_delta_deg: 5.0
+  fusion:
+    voxel_size: 0.06

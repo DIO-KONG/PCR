@@ -77,6 +77,66 @@ max_rotation_delta_deg: 5deg
 
 `top_candidates.md` 中的候选来自不同粗阈值。候选排序分数只用于实验选择，不代表真实建图质量；最终仍应结合 `overlay.ply` 可视化检查。
 
+## 参数 sweep
+
+粗配准参数筛选入口位于：
+
+```text
+testbench/sweep_shared_frame_alignment.py
+```
+
+该脚本会自动从两个 DA3 NPZ 的 `image_names` 中发现共享帧，并生成共享帧组合，不硬编码某个 window 中具体哪几帧表现好。默认用于测试：
+
+- `sampling.conf_percentile = 0, 5, 10, 20`
+- `sampling.stride = 6, 4, 3, 2`
+- 自动共享帧的 4选3 组合和全共享帧组合
+- `ransac.thresholds = 0.18, 0.14, 0.10, 0.06`
+
+这个 sweep 默认关闭 ICP，只评估共享帧粗配准本身。原因是 ICP 会引入点云局部表面几何因素，容易掩盖采样和共享帧组合对粗配准的影响。
+
+## dynamic_top3_shared_frame_bounded_icp
+
+`dynamic_top3_shared_frame_bounded_icp` 是当前用于 walk-forward 建图的版本。它把前面单步实验中确认较稳定的策略固定下来：
+
+- 自动发现相邻 DA3 batch 的共享帧。
+- 枚举共享帧 4选3 组合，不硬编码某个 window 中哪几帧好。
+- 对每个 3 帧组合执行共享像素 3D 对应点粗配准。
+- 按 `score = inlier_ratio - median_error - 0.25 * p90_error` 选择最佳组合。
+- 将相邻 batch 刚体变换组合到 global 坐标系。
+- 以累计 world 为 target 做有边界 point-to-plane ICP。
+- ICP 在 `0.15m / 5deg` 边界内即采用；共享帧一致性只记录为诊断，不作为拒绝条件。
+
+固定参数为：
+
+```text
+sampling.conf_percentile: 20.0
+sampling.stride: 6
+sampling.max_points_per_frame: 8000
+ransac.thresholds: 0.18, 0.14, 0.10, 0.06
+ransac.iterations: 3000
+ransac.evaluation_threshold: 0.06
+icp.voxel_size: 0.06
+icp.max_correspondence_distance: 0.08
+icp.max_translation_delta: 0.15
+icp.max_rotation_delta_deg: 5.0
+fusion.voxel_size: 0.06
+```
+
+完整 walk-forward 入口为：
+
+```bash
+.env/bin/python testbench/run_shared_frame_walkforward.py \
+  --config testbench/configs/experiments/shared_frame_walkforward.yaml \
+  --run-name dynamic_top3_bounded_icp_walkforward \
+  --overwrite
+```
+
+输出位于：
+
+```text
+result/walkforward_shared_frame/<run_name>/
+```
+
 ## 已知局限
 
 - 同一像素在不同 batch 中的置信度和深度可能不同，导致对应点含有系统噪声。

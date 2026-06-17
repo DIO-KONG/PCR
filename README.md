@@ -130,3 +130,74 @@ overlay clouds: result/preprocess/.../floor_removed.ply
 ```
 
 算法详细说明见 `algorithm/shared_frame_alignment.md`。
+
+## 共享帧粗配准参数实验
+
+如果只想评估共享帧粗配准参数，不生成 overlay，也不跑 ICP，可使用 sweep 入口：
+
+```bash
+.env/bin/python testbench/sweep_shared_frame_alignment.py \
+  --run-name conf_stride_frame3_threshold_sweep
+```
+
+该入口会自动从两个 DA3 NPZ 中发现共享帧，不硬编码 `9/10/11/12`。默认实验组合为：
+
+```text
+sampling.conf_percentile: 0, 5, 10, 20
+sampling.stride:          6, 4, 3, 2
+shared frame sets:        自动共享帧 4选3 + 全共享帧
+ransac.thresholds:        0.18, 0.14, 0.10, 0.06
+ransac.iterations:        300
+```
+
+输出位于：
+
+```text
+result/shared_frame_sweep/<run_name>/
+```
+
+重点查看：
+
+```text
+summary.md
+summary.csv
+summary.json
+```
+
+## Walk-Forward 建图实验
+
+当前推荐的完整链路是 `dynamic_top3_shared_frame_bounded_icp`：
+
+```bash
+.env/bin/python testbench/run_shared_frame_walkforward.py \
+  --config testbench/configs/experiments/shared_frame_walkforward.yaml \
+  --run-name dynamic_top3_bounded_icp_walkforward \
+  --overwrite
+```
+
+该入口会：
+
+- 自动补齐 `result/preprocess/<batch>/floor_removed.ply`。
+- 对每个相邻 window 自动发现共享帧并做 4选3。
+- 使用最佳 3 帧组合做共享帧刚体粗配准。
+- 将 source 投到累计 world 后，对累计 world 做 bounded point-to-plane ICP。
+- ICP 在 `0.15m / 5deg` 内即采用，否则回退 coarse。
+- 每步融合进累计 world，并保存最终 `final_world.ply`。
+
+输出位于：
+
+```text
+result/walkforward_shared_frame/<run_name>/
+```
+
+重点查看：
+
+```text
+summary.md
+summary.json
+final_world.ply
+step_*/frame_combo_ranking.md
+step_*/coarse_overlay.ply
+step_*/bounded_icp_overlay.ply
+step_*/metrics.json
+```
