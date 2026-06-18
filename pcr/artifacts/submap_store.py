@@ -127,6 +127,7 @@ class SubmapArtifactStore:
                     "batch_order": submap.batch_order,
                     "registered_batch_order": submap.registered_batch_order,
                     "fused_batch_order": submap.fused_batch_order,
+                    "provisional_batch_order": submap.provisional_batch_order,
                     "overlap_seed_candidates": submap.fused_batch_order,
                     "step_count": submap.step_count,
                     "voxel_count": len(submap.fusion.voxel_map.voxels),

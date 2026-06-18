@@ -12,6 +12,7 @@ from pcr.artifacts.store import ArtifactStore, json_safe
 from pcr.config.loader import build_sequence_task, load_yaml
 from pcr.domain import Transform
 from pcr.pipeline.sequence import SequencePipeline
+from pcr.preprocessing.pipeline import PreprocessService
 
 
 DEFAULT_CONFIG = Path("testbench/configs/experiments/shared_frame_walkforward.yaml")
@@ -47,7 +48,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     baseline_transform = Transform(source=sequence_task.baseline.batch_id, target="global", matrix=np.eye(4))
     artifact_store.write_initial_transform(baseline_transform)
 
-    pipeline = SequencePipeline()
+    preprocess_service = PreprocessService.from_config(config.get("preprocess"))
+    pipeline = SequencePipeline(preprocess_service=preprocess_service)
     output = pipeline.run(task=sequence_task, run_name=run_name, run_dir=run_dir)
 
     summary_rows: list[dict[str, Any]] = []

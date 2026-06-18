@@ -105,6 +105,7 @@ online submap 中严格区分三件事：
 pose rejected:
   保存诊断
   不融合
+  只进入 provisional_batch_order，用于相邻链路继续试算
   不进入 registered_batch_order
   不进入 fused_batch_order
 
@@ -129,6 +130,9 @@ previous.fused_batch_order[-submap_overlap:]
 ```
 
 这样可以保留失败 step 的诊断和位姿尝试，同时避免未融合或低质量点云间接污染下一个 submap。
+
+`provisional_batch_order` 中的 transform 只用于后续相邻 batch 继续组合初值；
+它不表示该 batch 已可靠注册，也不会参与新 submap 的 overlap seed。
 
 ## 运行
 

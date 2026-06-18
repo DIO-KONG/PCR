@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pcr.algorithms.refinement.icp import BoundedPointToPlaneIcp
+import numpy as np
+
+from pcr.algorithms.refinement.icp import make_refiner
 from pcr.algorithms.shared_frame.frame_selection import (
     DynamicTopKSharedFrameSelector,
     evaluate_selected_shared_frames,
 )
-from pcr.domain import RegistrationTask, StepResult
+from pcr.domain import RegistrationTask, StepResult, Transform
 from pcr.io.pointcloud_io import load_point_cloud
 from pcr.preprocessing.pipeline import PreprocessService
 from pcr.state.world import WorldState
@@ -39,11 +41,11 @@ class RegistrationStepPipeline:
         *,
         preprocess_service: PreprocessService | None = None,
         frame_selector: DynamicTopKSharedFrameSelector | None = None,
-        icp_refiner: BoundedPointToPlaneIcp | None = None,
+        icp_refiner=None,
     ) -> None:
         self.preprocess_service = preprocess_service or PreprocessService()
         self.frame_selector = frame_selector or DynamicTopKSharedFrameSelector()
-        self.icp_refiner = icp_refiner or BoundedPointToPlaneIcp()
+        self.icp_refiner = icp_refiner
 
     def run(self, task: RegistrationTask, world: WorldState) -> StepPipelineOutput:
         self.preprocess_service.ensure_floor_removed(task.source)
@@ -59,13 +61,27 @@ class RegistrationStepPipeline:
         )
         coarse = selection_payload.registration
 
-        # coarse.selected.transform 是 source -> target；target_to_global 是 target -> global。
-        # 使用 Transform.then() 后得到 source -> global，并由 Transform 校验方向。
+        # shared-frame coarse 是在 DA3 NPZ 的 raw batch 坐标里估计的；而后续
+        # overlay/ICP 使用的是预处理后的 PLY。若预处理做过 floor alignment，
+        # 需要显式换基，否则 shared 点能对齐但整云 overlay 会偏。
+        source_alignment = self.preprocess_service.alignment_matrix(task.source)
+        target_alignment = self.preprocess_service.alignment_matrix(task.target)
+        pairwise_preprocessed = Transform(
+            source=task.source.batch_id,
+            target=task.target.batch_id,
+            matrix=target_alignment @ coarse.selected.transform.matrix @ np.linalg.inv(source_alignment),
+        )
+
+        # pairwise_preprocessed 是 source-preprocessed -> target-preprocessed；
+        # target_to_global 是 target-preprocessed -> global。
+        # 使用 Transform.then() 后得到 source-preprocessed -> global，并由
+        # Transform 校验方向。
         target_to_global = world.transform_to_global(task.target.batch_id)
-        coarse_global = coarse.selected.transform.then(target_to_global)
+        coarse_global = pairwise_preprocessed.then(target_to_global)
         coarse_registered = coarse_global.apply_cloud(source_cloud)
 
-        refinement = self.icp_refiner.refine(
+        refiner = self.icp_refiner or make_refiner(task.params["icp"])
+        refinement = refiner.refine(
             source_cloud=source_cloud,
             target_world=world.world_cloud,
             initial_transform=coarse_global,
@@ -97,4 +113,3 @@ class RegistrationStepPipeline:
             ),
             frame_combo_rows=selection_payload.rows,
         )
-

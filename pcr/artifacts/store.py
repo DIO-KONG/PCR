@@ -9,7 +9,8 @@ import numpy as np
 import yaml
 
 from pcr.domain import PipelineResult, StepResult, Transform, WorldUpdateResult
-from pcr.io.pointcloud_io import make_registration_overlay, save_point_cloud
+from pcr.algorithms.shared_frame.geometry import transform_points
+from pcr.io.pointcloud_io import make_registration_overlay, make_shared_frame_overlay, save_point_cloud
 
 
 def json_safe(value: Any) -> Any:
@@ -122,6 +123,14 @@ class ArtifactStore:
         step_dir = self.run_dir / f"step_{task.step_index:02d}_{task.source.batch_id}_to_{task.target.batch_id}"
         step_dir.mkdir(parents=True, exist_ok=True)
 
+        transformed_shared_source = transform_points(step.coarse.source_points, step.coarse.selected.transform.matrix)
+        save_point_cloud(
+            step_dir / "shared_frame_overlay.ply",
+            make_shared_frame_overlay(
+                target_points=step.coarse.target_points,
+                transformed_source_points=transformed_shared_source,
+            ),
+        )
         save_point_cloud(step_dir / "coarse_overlay.ply", make_registration_overlay(world_before_step, step.coarse_registered_source))
         save_point_cloud(step_dir / "bounded_icp_overlay.ply", make_registration_overlay(world_before_step, step.refined_registered_source))
         save_point_cloud(step_dir / "final_registered_source.ply", step.final_registered_source)

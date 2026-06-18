@@ -116,6 +116,8 @@ class SubmapSequencePipeline:
                     )
                 else:
                     active.remember_fused_batch(step_task.source.batch_id)
+            else:
+                active.remember_provisional_batch(step_task.source.batch_id, step_result.final_transform)
 
             active.step_count += 1
             submap_step = SubmapStepResult(

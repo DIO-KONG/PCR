@@ -24,8 +24,10 @@ class SubmapState:
     transforms_to_submap: dict[str, Transform]
     # registered_batch_order：已经通过 pose gate、拥有可追踪 transform 的 batch。
     # fused_batch_order：真正写入 voxel map、可作为下一个 submap overlap seed 的 batch。
+    # provisional_batch_order：pose rejected 但为了相邻链路继续试算而保留的临时 transform。
     registered_batch_order: list[str] = field(default_factory=list)
     fused_batch_order: list[str] = field(default_factory=list)
+    provisional_batch_order: list[str] = field(default_factory=list)
     batch_order: list[str] = field(default_factory=list)
     step_count: int = 0
 
@@ -48,6 +50,19 @@ class SubmapState:
         self.transforms_to_submap[batch_id] = transform
         if batch_id not in self.registered_batch_order:
             self.registered_batch_order.append(batch_id)
+        if batch_id not in self.batch_order:
+            self.batch_order.append(batch_id)
+
+    def remember_provisional_batch(self, batch_id: str, transform: Transform) -> None:
+        """记录 pose rejected 的临时位姿。
+
+        这只用于让下一步相邻 batch 还能组合初值继续试算；它不会进入
+        registered/fused，也不会作为 overlap seed。
+        """
+
+        self.transforms_to_submap[batch_id] = transform
+        if batch_id not in self.provisional_batch_order:
+            self.provisional_batch_order.append(batch_id)
         if batch_id not in self.batch_order:
             self.batch_order.append(batch_id)
 
@@ -106,6 +121,7 @@ class SubmapManager:
             transforms_to_submap={baseline_id: baseline_transform},
             registered_batch_order=[baseline_id],
             fused_batch_order=[baseline_id],
+            provisional_batch_order=[],
             batch_order=[baseline_id],
         )
         self.submaps = [submap]
@@ -128,11 +144,11 @@ class SubmapManager:
 
     def create_next_submap(self, batch_cloud_paths: dict[str, str]) -> SubmapState:
         previous = self.active
-        overlap_batches = previous.fused_batch_order[-int(self.submap_overlap) :]
-        if not overlap_batches:
+        seed_batches = previous.fused_batch_order[-int(self.submap_overlap) :]
+        if not seed_batches:
             raise RuntimeError("Cannot create next submap without fusion-accepted overlap batches.")
 
-        anchor_batch = overlap_batches[-1]
+        anchor_batch = seed_batches[-1]
         anchor_to_previous = previous.transform_to_submap(anchor_batch)
         previous_to_anchor = anchor_to_previous.inverse()
         new_index = len(self.submaps)
@@ -140,21 +156,55 @@ class SubmapManager:
 
         seed_cloud = o3d.geometry.PointCloud()
         transforms: dict[str, Transform] = {}
-        for batch_id in overlap_batches:
-            if batch_id not in batch_cloud_paths:
-                continue
+        registered_order: list[str] = []
+        fused_order: list[str] = []
+        provisional_order: list[str] = []
+        batch_order: list[str] = []
+
+        def remember_order(target: list[str], batch_id: str) -> None:
+            if batch_id not in target:
+                target.append(batch_id)
+            if batch_id not in batch_order:
+                batch_order.append(batch_id)
+
+        def carry_transform(batch_id: str) -> Transform:
             batch_to_previous = previous.transform_to_submap(batch_id)
             batch_to_new = batch_to_previous.then(previous_to_anchor)
-            transforms[batch_id] = Transform(
+            transform = Transform(
                 source=batch_id,
                 target=new_submap_id,
                 matrix=batch_to_new.matrix,
             )
+            transforms[batch_id] = transform
+            return transform
+
+        for batch_id in seed_batches:
+            if batch_id not in batch_cloud_paths:
+                continue
+            transform = carry_transform(batch_id)
             cloud = load_point_cloud(batch_cloud_paths[batch_id])
-            seed_cloud += transforms[batch_id].apply_cloud(cloud)
+            seed_cloud += transform.apply_cloud(cloud)
+            remember_order(registered_order, batch_id)
+            remember_order(fused_order, batch_id)
 
         if seed_cloud.is_empty():
             raise RuntimeError(f"Failed to seed {new_submap_id}; overlap batches have no loadable clouds.")
+
+        # 地图 seed 只来自 fused batch；但为了相邻链路不中断，需要把最近若干
+        # 非融合 batch 的 transform 也带入新 submap。它们不会写入 voxel map，
+        # 也不会成为下一次 overlap seed。
+        carry_batches = previous.batch_order[-int(self.submap_overlap) :]
+        for batch_id in carry_batches:
+            if batch_id not in previous.transforms_to_submap:
+                continue
+            if batch_id not in transforms:
+                carry_transform(batch_id)
+            if batch_id in previous.registered_batch_order:
+                remember_order(registered_order, batch_id)
+            elif batch_id in previous.provisional_batch_order:
+                remember_order(provisional_order, batch_id)
+            elif batch_id not in batch_order:
+                batch_order.append(batch_id)
 
         fusion = ConservativeVoxelHashFusion.from_initial_cloud(seed_cloud, config=self.fusion_config)
         submap = SubmapState(
@@ -162,9 +212,10 @@ class SubmapManager:
             anchor_batch_id=anchor_batch,
             fusion=fusion,
             transforms_to_submap=transforms,
-            registered_batch_order=list(overlap_batches),
-            fused_batch_order=list(overlap_batches),
-            batch_order=list(overlap_batches),
+            registered_batch_order=registered_order,
+            fused_batch_order=fused_order,
+            provisional_batch_order=provisional_order,
+            batch_order=batch_order,
         )
         self.submaps.append(submap)
 

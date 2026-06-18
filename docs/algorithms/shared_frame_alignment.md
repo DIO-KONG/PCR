@@ -26,17 +26,26 @@ shared frames: 9.png, 10.png, 11.png, 12.png
 6. 每个候选通过 Kabsch/SVD 在内点上做刚体 refit。
 7. 使用逐步收紧的阈值再次 refit，只估计旋转和平移，不估计尺度。
 8. 所有候选统一按严格 `evaluation_threshold` 重新计算误差并排序。
-9. 对排序第一的候选执行有边界 point-to-plane ICP，只允许从共享帧初值附近小幅刚体微调。
+9. 对排序第一的候选执行有边界 refine。默认是 point-to-plane ICP；调试时也可切换为 Sim(3) point-to-point refine，用于验证 DA3 batch 间轻微尺度差异的影响。
 10. 输出 top K 候选，实验流程默认选排序第一的候选。
 
-## 为什么不做尺度
+## 尺度调试
 
 DA3 不同 batch 之间可能存在轻微尺度差异，例如 5% 左右。但当前阶段先保持刚体配准，有两个原因：
 
 - 便于判断误差主要来自姿态、深度噪声、像素覆盖差异，还是确实需要 Sim(3)。
 - 避免尺度自由度在局部共享帧上吸收错误对应点，导致视觉上更难解释的变形。
 
-如果后续确认刚体误差无法满足需求，再单独实现 Sim(3) 对照实验。
+当前已提供一个有边界 Sim(3) 对照 refine：
+
+```yaml
+algorithm:
+  icp:
+    method: sim3_point_to_point
+    max_scale_delta: 0.08
+```
+
+粗配准仍然只估计 SE(3)，Sim(3) 只在 refine 阶段生效。若 refine 相对 coarse 的平移、旋转或尺度变化超过边界，会回退到 coarse。`metrics.json` 中会记录 `delta_scale` 和 `scale_delta`。
 
 ## 关键参数
 
@@ -76,6 +85,13 @@ max_rotation_delta_deg: 5deg
 - `refinement_history`：逐阈值 refit 的过程记录。
 - `icp_refinement`：局部 ICP 的 fitness、RMSE、相对初值位移和旋转，以及是否被边界接受。
 - `pre_icp_shared_metrics`：进入 ICP 前的共享帧对应点指标，便于对比 ICP 是否改善视觉点云但损伤共享帧误差。
+
+每个 step 还会输出 `shared_frame_overlay.ply`：
+
+- target/baseline 共享帧点：灰色。
+- source/window 共享帧点：先用 coarse source->target 变换投到 target 坐标，再染成黄色。
+
+这个文件用于调试粗配准本身，不受 global world、ICP target 或融合策略影响。
 
 `top_candidates.md` 中的候选来自不同粗阈值。候选排序分数只用于实验选择，不代表真实建图质量；最终仍应结合 `overlay.ply` 可视化检查。
 

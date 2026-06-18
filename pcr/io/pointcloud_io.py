@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import open3d as o3d
 
 
@@ -45,3 +46,29 @@ def make_registration_overlay(
     target_copy.paint_uniform_color((0.55, 0.55, 0.55))
     source_copy.paint_uniform_color((1.0, 0.82, 0.05))
     return target_copy + source_copy
+
+
+def point_cloud_from_points(points: np.ndarray, color: tuple[float, float, float]) -> o3d.geometry.PointCloud:
+    """把 Nx3 数组转换成统一颜色点云，用于轻量调试 artifact。"""
+
+    cloud = o3d.geometry.PointCloud()
+    cloud.points = o3d.utility.Vector3dVector(np.asarray(points, dtype=float))
+    cloud.paint_uniform_color(color)
+    return cloud
+
+
+def make_shared_frame_overlay(
+    *,
+    target_points: np.ndarray,
+    transformed_source_points: np.ndarray,
+) -> o3d.geometry.PointCloud:
+    """生成共享帧对应点 overlay。
+
+    坐标系约定为 target batch 坐标：target/baseline 点为灰色，source/window
+    点先用 coarse source->target 变换后染成黄色。这个 artifact 专门用于检查
+    shared-frame 粗配准，而不是检查 global world 融合。
+    """
+
+    target_cloud = point_cloud_from_points(target_points, (0.55, 0.55, 0.55))
+    source_cloud = point_cloud_from_points(transformed_source_points, (1.0, 0.82, 0.05))
+    return target_cloud + source_cloud
