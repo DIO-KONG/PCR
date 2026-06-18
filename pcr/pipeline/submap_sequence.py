@@ -81,13 +81,13 @@ class SubmapSequencePipeline:
             world_before = o3d.geometry.PointCloud(active.local_cloud)
             step_output = self.step_pipeline.run(step_task, world_view)
             step_result = step_output.step_result
-            active.remember_batch(step_task.source.batch_id, step_result.final_transform)
 
             pose_quality = evaluate_pose_quality(step_result, quality_config)
             fusion_result = None
             final_quality = pose_quality
 
             if pose_quality.pose_status != QualityStatus.REJECTED:
+                active.remember_registered_batch(step_task.source.batch_id, step_result.final_transform)
                 sampling = step_task.params.get("sampling", {})
                 frame_cloud, new_frame_names = build_new_frame_clouds(
                     step_task.source,
@@ -114,6 +114,8 @@ class SubmapSequencePipeline:
                         report=fusion_result.report,
                         debug_clouds=fusion_result.debug_clouds,
                     )
+                else:
+                    active.remember_fused_batch(step_task.source.batch_id)
 
             active.step_count += 1
             submap_step = SubmapStepResult(

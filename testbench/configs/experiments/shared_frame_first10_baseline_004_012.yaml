@@ -1,0 +1,127 @@
+name: shared_frame_first10_baseline_004_012
+result_root: result/walkforward_shared_frame
+baseline:
+  id: batch_001_baseline_004-012
+  npz: da3/data/raw/pointcloud/batch_001_baseline_004-012.npz
+  raw_cloud: da3/data/raw/pointcloud/batch_001_baseline_004-012.ply
+  cloud: result/preprocess/batch_001_baseline_004-012/floor_removed.ply
+steps:
+  - id: step_001_batch_002_to_baseline_004_012
+    source_id: batch_002_window_009-013
+    target_id: batch_001_baseline_004-012
+    source_npz: da3/data/raw/pointcloud/batch_002_window_009-013.npz
+    target_npz: da3/data/raw/pointcloud/batch_001_baseline_004-012.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_002_window_009-013.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_001_baseline_004-012.ply
+    source_cloud: result/preprocess/batch_002_window_009-013/floor_removed.ply
+    target_cloud: result/preprocess/batch_001_baseline_004-012/floor_removed.ply
+  - id: step_002_batch_003_to_batch_002
+    source_id: batch_003_window_010-014
+    target_id: batch_002_window_009-013
+    source_npz: da3/data/raw/pointcloud/batch_003_window_010-014.npz
+    target_npz: da3/data/raw/pointcloud/batch_002_window_009-013.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_003_window_010-014.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_002_window_009-013.ply
+    source_cloud: result/preprocess/batch_003_window_010-014/floor_removed.ply
+    target_cloud: result/preprocess/batch_002_window_009-013/floor_removed.ply
+  - id: step_003_batch_004_to_batch_003
+    source_id: batch_004_window_011-015
+    target_id: batch_003_window_010-014
+    source_npz: da3/data/raw/pointcloud/batch_004_window_011-015.npz
+    target_npz: da3/data/raw/pointcloud/batch_003_window_010-014.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_004_window_011-015.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_003_window_010-014.ply
+    source_cloud: result/preprocess/batch_004_window_011-015/floor_removed.ply
+    target_cloud: result/preprocess/batch_003_window_010-014/floor_removed.ply
+  - id: step_004_batch_005_to_batch_004
+    source_id: batch_005_window_012-016
+    target_id: batch_004_window_011-015
+    source_npz: da3/data/raw/pointcloud/batch_005_window_012-016.npz
+    target_npz: da3/data/raw/pointcloud/batch_004_window_011-015.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_005_window_012-016.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_004_window_011-015.ply
+    source_cloud: result/preprocess/batch_005_window_012-016/floor_removed.ply
+    target_cloud: result/preprocess/batch_004_window_011-015/floor_removed.ply
+  - id: step_005_batch_006_to_batch_005
+    source_id: batch_006_window_013-017
+    target_id: batch_005_window_012-016
+    source_npz: da3/data/raw/pointcloud/batch_006_window_013-017.npz
+    target_npz: da3/data/raw/pointcloud/batch_005_window_012-016.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_006_window_013-017.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_005_window_012-016.ply
+    source_cloud: result/preprocess/batch_006_window_013-017/floor_removed.ply
+    target_cloud: result/preprocess/batch_005_window_012-016/floor_removed.ply
+  - id: step_006_batch_007_to_batch_006
+    source_id: batch_007_window_014-018
+    target_id: batch_006_window_013-017
+    source_npz: da3/data/raw/pointcloud/batch_007_window_014-018.npz
+    target_npz: da3/data/raw/pointcloud/batch_006_window_013-017.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_007_window_014-018.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_006_window_013-017.ply
+    source_cloud: result/preprocess/batch_007_window_014-018/floor_removed.ply
+    target_cloud: result/preprocess/batch_006_window_013-017/floor_removed.ply
+  - id: step_007_batch_008_to_batch_007
+    source_id: batch_008_window_015-019
+    target_id: batch_007_window_014-018
+    source_npz: da3/data/raw/pointcloud/batch_008_window_015-019.npz
+    target_npz: da3/data/raw/pointcloud/batch_007_window_014-018.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_008_window_015-019.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_007_window_014-018.ply
+    source_cloud: result/preprocess/batch_008_window_015-019/floor_removed.ply
+    target_cloud: result/preprocess/batch_007_window_014-018/floor_removed.ply
+  - id: step_008_batch_009_to_batch_008
+    source_id: batch_009_window_016-020
+    target_id: batch_008_window_015-019
+    source_npz: da3/data/raw/pointcloud/batch_009_window_016-020.npz
+    target_npz: da3/data/raw/pointcloud/batch_008_window_015-019.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_009_window_016-020.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_008_window_015-019.ply
+    source_cloud: result/preprocess/batch_009_window_016-020/floor_removed.ply
+    target_cloud: result/preprocess/batch_008_window_015-019/floor_removed.ply
+  - id: step_009_batch_010_to_batch_009
+    source_id: batch_010_window_017-021
+    target_id: batch_009_window_016-020
+    source_npz: da3/data/raw/pointcloud/batch_010_window_017-021.npz
+    target_npz: da3/data/raw/pointcloud/batch_009_window_016-020.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_010_window_017-021.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_009_window_016-020.ply
+    source_cloud: result/preprocess/batch_010_window_017-021/floor_removed.ply
+    target_cloud: result/preprocess/batch_009_window_016-020/floor_removed.ply
+  - id: step_010_batch_011_to_batch_010
+    source_id: batch_011_window_018-022
+    target_id: batch_010_window_017-021
+    source_npz: da3/data/raw/pointcloud/batch_011_window_018-022.npz
+    target_npz: da3/data/raw/pointcloud/batch_010_window_017-021.npz
+    source_raw_cloud: da3/data/raw/pointcloud/batch_011_window_018-022.ply
+    target_raw_cloud: da3/data/raw/pointcloud/batch_010_window_017-021.ply
+    source_cloud: result/preprocess/batch_011_window_018-022/floor_removed.ply
+    target_cloud: result/preprocess/batch_010_window_017-021/floor_removed.ply
+algorithm:
+  frame_combo_size: 3
+  sampling:
+    conf_percentile: 20.0
+    stride: 6
+    max_points_per_frame: 8000
+    random_seed: 7
+  ransac:
+    iterations: 3000
+    sample_size: 6
+    thresholds: [0.18, 0.14, 0.10, 0.06]
+    evaluation_threshold: 0.06
+    min_inliers: 50
+    seed: 7
+  refinement:
+    enabled: true
+    thresholds: [0.18, 0.14, 0.10, 0.06]
+    iterations_per_threshold: 2
+    min_points: 200
+  icp:
+    voxel_size: 0.06
+    max_correspondence_distance: 0.08
+    normal_radius: 0.18
+    normal_max_nn: 30
+    max_iteration: 40
+    max_translation_delta: 0.15
+    max_rotation_delta_deg: 5.0
+  fusion:
+    voxel_size: 0.06

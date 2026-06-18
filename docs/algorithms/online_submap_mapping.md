@@ -89,6 +89,47 @@ T_submap_i_to_global = T_submap_i_to_submap_i-1 @ T_submap_i-1_to_global
 
 第一版只维护链式位姿，不做回环和 pose graph 全局优化。显示全局预览时，将每个 submap 的 `local_world.ply` 按链式位姿临时组合成 `global_preview.ply`。
 
+## Step 状态语义
+
+online submap 中严格区分三件事：
+
+```text
+走过/尝试过
+已配准并记录 transform
+已融合进地图并可作为 overlap seed
+```
+
+具体规则：
+
+```text
+pose rejected:
+  保存诊断
+  不融合
+  不进入 registered_batch_order
+  不进入 fused_batch_order
+
+pose accepted, fusion rejected:
+  记录 transform
+  进入 registered_batch_order
+  不进入 fused_batch_order
+  不作为下一个 submap 的 overlap seed
+
+fusion accepted:
+  记录 transform
+  更新 voxel map
+  进入 registered_batch_order
+  进入 fused_batch_order
+  可作为下一个 submap 的 overlap seed
+```
+
+submap 切换可以按步数触发，但新 submap 初始化只能使用：
+
+```text
+previous.fused_batch_order[-submap_overlap:]
+```
+
+这样可以保留失败 step 的诊断和位姿尝试，同时避免未融合或低质量点云间接污染下一个 submap。
+
 ## 运行
 
 生成显式 327 帧配置：
