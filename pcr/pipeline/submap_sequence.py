@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import copy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -99,22 +97,16 @@ class SubmapSequencePipeline:
                     floor_distance_threshold=float(fusion_config.get("floor_distance_threshold", 0.03)),
                 )
                 incoming = step_result.final_transform.apply_cloud(frame_cloud)
-                before_voxels = copy.deepcopy(active.fusion.voxel_map)
                 fusion_result = active.fusion.fuse(
                     incoming_cloud=incoming,
                     step_index=step_task.step_index,
                     new_frame_names=new_frame_names,
                 )
                 final_quality = apply_fusion_quality(pose_quality, fusion_result.report, quality_config)
-                if not final_quality.fusion_accepted:
-                    # 融合质量不过关时回滚主 voxel map，但保留 debug 点云和报告。
-                    active.fusion.voxel_map = before_voxels
-                    fusion_result = type(fusion_result)(
-                        fused_cloud=active.local_cloud,
-                        report=fusion_result.report,
-                        debug_clouds=fusion_result.debug_clouds,
-                    )
-                else:
+                # 方案 B 是点级过滤：accepted 写入，duplicate 更新，conflict 丢弃。
+                # 只要本步确实改动了 voxel map，就记录为 fused，供 submap 切换时
+                # 使用过滤后的 local map 作为 overlap seed。
+                if fusion_result.report.accepted_points + fusion_result.report.duplicate_points > 0:
                     active.remember_fused_batch(step_task.source.batch_id)
             else:
                 active.remember_provisional_batch(step_task.source.batch_id, step_result.final_transform)

@@ -6,7 +6,6 @@ import numpy as np
 import open3d as o3d
 
 from pcr.domain import SubmapEdge, Transform
-from pcr.io.pointcloud_io import load_point_cloud
 from pcr.state.fusion import ConservativeVoxelHashFusion
 
 
@@ -154,7 +153,6 @@ class SubmapManager:
         new_index = len(self.submaps)
         new_submap_id = f"submap_{new_index:03d}"
 
-        seed_cloud = o3d.geometry.PointCloud()
         transforms: dict[str, Transform] = {}
         registered_order: list[str] = []
         fused_order: list[str] = []
@@ -179,14 +177,14 @@ class SubmapManager:
             return transform
 
         for batch_id in seed_batches:
-            if batch_id not in batch_cloud_paths:
-                continue
             transform = carry_transform(batch_id)
-            cloud = load_point_cloud(batch_cloud_paths[batch_id])
-            seed_cloud += transform.apply_cloud(cloud)
             remember_order(registered_order, batch_id)
             remember_order(fused_order, batch_id)
 
+        # 方案 B 的主地图已经是 accepted/duplicate 过滤后的 voxel map。
+        # 新 submap 用过滤后的 local map 做 seed，而不是重新加载完整 batch PLY，
+        # 否则之前丢弃的 conflict 点会在 submap 切换时被带回来。
+        seed_cloud = previous_to_anchor.apply_cloud(previous.local_cloud)
         if seed_cloud.is_empty():
             raise RuntimeError(f"Failed to seed {new_submap_id}; overlap batches have no loadable clouds.")
 

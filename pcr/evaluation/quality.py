@@ -84,7 +84,9 @@ def apply_fusion_quality(
     if pose_report.pose_status == QualityStatus.REJECTED:
         fusion_status = QualityStatus.REJECTED
     elif fusion_report.conflict_ratio > max_conflict_ratio:
-        fusion_status = QualityStatus.REJECTED
+        # fusion 采用点级过滤：accepted 写入、duplicate 更新、conflict 丢弃。
+        # 因此高冲突率只表示需要人工复查，不再回滚整步融合结果。
+        fusion_status = QualityStatus.NEEDS_REVIEW
     elif reasons:
         fusion_status = QualityStatus.NEEDS_REVIEW
     else:
