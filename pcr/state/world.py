@@ -7,7 +7,7 @@ import numpy as np
 
 from pcr.domain import StepResult, Transform, WorldUpdateResult
 from pcr.state.fusion import AppendVoxelFusion
-from utils.preprocess import describe_point_cloud
+from pcr.preprocessing.preprocess import describe_point_cloud
 
 
 @dataclass

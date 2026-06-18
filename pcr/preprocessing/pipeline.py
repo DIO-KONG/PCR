@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pcr.domain import BatchRef
 from pcr.io.pointcloud_io import load_point_cloud
-from utils.preprocess import (
+from pcr.preprocessing.preprocess import (
     load_point_cloud as load_raw_point_cloud,
     preprocess_for_registration,
     save_point_cloud,
@@ -15,7 +15,7 @@ from utils.preprocess import (
 class PreprocessService:
     """确保配准需要的去地板点云存在。
 
-    当前复用 `utils.preprocess` 的成熟实现；本类只负责把“缺失则补齐”从
+    当前复用 `pcr.preprocessing.preprocess` 的成熟实现；本类只负责把“缺失则补齐”从
     walk-forward runner 中拿出来，避免 runner 同时承担预处理细节。
     """
 
@@ -32,4 +32,3 @@ class PreprocessService:
         save_point_cloud(output_path, result.cloud)
         write_debug_outputs(output_path.parent / "debug", result)
         return output_path
-

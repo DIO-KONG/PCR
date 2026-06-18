@@ -8,7 +8,7 @@
 pcr/domain/        稳定数据模型与 Transform 方向约定
 pcr/config/        YAML 读取和配置到任务模型的转换
 pcr/io/            DA3 NPZ 与 PLY 的基础读写
-pcr/preprocessing/ 缺失预处理结果的补齐入口
+pcr/preprocessing/ 点云预处理、地板检测、去地板和缺失结果补齐
 pcr/algorithms/    shared-frame 粗配准和 bounded ICP 等数值算法
 pcr/evaluation/    评分与指标计算
 pcr/state/         WorldState、transform graph 和融合策略

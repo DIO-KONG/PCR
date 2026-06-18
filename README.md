@@ -2,32 +2,20 @@
 
 本项目在 WSL Ubuntu 22.04 中开发，所有 Python 环境和依赖都位于 `.env/`。
 
-## 可视化点云
-
-```bash
-.env/bin/python utils/visualize.py da3/data/raw/pointcloud/batch_01_baseline_001-012.ply
-```
-
-两个点云对比可视化：
-
-```bash
-.env/bin/python utils/visualize.py target.ply source.ply
-```
-
 ## 点云预处理
 
-`utils/preprocess.py` 同时提供 Python API 和 CLI。模块只做点云预处理，不修改 `da3/` 原始数据。
+`pcr/preprocessing/preprocess.py` 同时提供 Python API 和 CLI。模块只做点云预处理，不修改 `da3/` 原始数据。
 
 基础统计：
 
 ```bash
-.env/bin/python utils/preprocess.py da3/data/raw/pointcloud/batch_01_baseline_001-012.ply --print-stats
+.env/bin/python -m pcr.preprocessing.preprocess da3/data/raw/pointcloud/batch_01_baseline_001-012.ply --print-stats
 ```
 
 地板法线对齐到 `+Y`，并保存调试产物：
 
 ```bash
-.env/bin/python utils/preprocess.py da3/data/raw/pointcloud/batch_01_baseline_001-012.ply \
+.env/bin/python -m pcr.preprocessing.preprocess da3/data/raw/pointcloud/batch_01_baseline_001-012.ply \
   --output result/preprocess/batch_01/aligned.ply \
   --align-floor \
   --write-debug result/preprocess/batch_01/debug
@@ -36,7 +24,7 @@
 地板对齐后去地板：
 
 ```bash
-.env/bin/python utils/preprocess.py da3/data/raw/pointcloud/batch_01_baseline_001-012.ply \
+.env/bin/python -m pcr.preprocessing.preprocess da3/data/raw/pointcloud/batch_01_baseline_001-012.ply \
   --output result/preprocess/batch_01/floor_removed.ply \
   --align-floor \
   --remove-floor \
@@ -52,7 +40,7 @@ result/preprocess/<输入文件stem>/
 例如：
 
 ```bash
-.env/bin/python utils/preprocess.py da3/data/raw/pointcloud/batch_01_baseline_001-012.ply \
+.env/bin/python -m pcr.preprocessing.preprocess da3/data/raw/pointcloud/batch_01_baseline_001-012.ply \
   --align-floor \
   --write-debug
 ```
@@ -142,7 +130,7 @@ shared frames: 9-rgb.png, 10-rgb.png, 11-rgb.png, 12-rgb.png
 overlay clouds: result/preprocess/.../floor_removed.ply
 ```
 
-算法详细说明见 `algorithm/shared_frame_alignment.md`。
+算法详细说明见 `docs/algorithms/shared_frame_alignment.md`。
 
 ## 共享帧粗配准参数实验
 

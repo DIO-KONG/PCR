@@ -24,7 +24,9 @@ import numpy as np
 import open3d as o3d
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# 当前文件位于 `pcr/preprocessing/preprocess.py`，项目根目录是 parents[2]。
+# 相对输出路径一律基于项目根目录解析，避免 CLI 从不同 cwd 调用时写到意外位置。
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PREPROCESS_ROOT = PROJECT_ROOT / "result" / "preprocess"
 Y_AXIS = np.asarray([0.0, 1.0, 0.0], dtype=float)
 

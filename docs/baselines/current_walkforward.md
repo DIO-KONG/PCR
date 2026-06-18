@@ -20,7 +20,7 @@
 - 预处理输出：`result/preprocess/<batch>/floor_removed.ply`
 - 配置：`testbench/configs/experiments/shared_frame_walkforward.yaml`
 
-如果 `floor_removed.ply` 缺失，`pcr.preprocessing.PreprocessService` 会调用 `utils.preprocess` 自动补齐。
+如果 `floor_removed.ply` 缺失，`pcr.preprocessing.PreprocessService` 会调用 `pcr.preprocessing.preprocess` 自动补齐。
 
 ## 关键输出
 
@@ -64,4 +64,3 @@ step 06: frames=15,16,17  icp=accepted             dt=0.0900m drot=2.610deg
 - `transforms/` 中包含 baseline 和 6 个 window 的 `_to_global.txt`。
 - `final_world.ply` 非空。
 - `summary.json` 能读出每步 selected frames、ICP 状态、ICP delta 和最终点数。
-

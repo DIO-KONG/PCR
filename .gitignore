@@ -48,6 +48,9 @@ dependencies/
 *.pth
 *.pt
 *.safetensors
+*.ply
+*.npz
+*.png
 
 # OS / editor files
 .DS_Store
