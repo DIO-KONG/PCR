@@ -7,12 +7,14 @@
 当前第一步配准为：
 
 ```text
-source: batch_02_window_009-013
-target: batch_01_baseline_001-012
-shared frames: 9-rgb.png, 10-rgb.png, 11-rgb.png, 12-rgb.png
+source: batch_002_window_009-013
+target: batch_001_baseline_001-012
+shared frames: 9.png, 10.png, 11.png, 12.png
 ```
 
 这两个 batch 对同一批图像帧分别预测了深度、内参、外参。虽然两个 batch 的局部 world 坐标系不同，但同一图像、同一像素理论上对应同一个真实空间点。因此可以把共享像素分别反投影到 source world 和 target world，形成 `source_point -> target_point` 的 3D 对应。
+
+长序列数据中图像命名为 `9.png`、`10.png` 等；实现按文件名前缀数字排序，并兼容历史 `9-rgb.png` 命名。
 
 ## 算法步骤
 
@@ -43,7 +45,7 @@ DA3 不同 batch 之间可能存在轻微尺度差异，例如 5% 左右。但�
 `ransac.thresholds` 是粗候选生成阈值。当前为：
 
 ```text
-0.12m, 0.10m, 0.08m, 0.06m
+0.18m, 0.14m, 0.10m, 0.06m
 ```
 
 较宽阈值用于在 DA3 深度和置信像素不完全一致时找到稳定初值；最终仍用严格阈值评估。
@@ -145,6 +147,20 @@ fusion.voxel_size: 0.06
 
 ```text
 result/walkforward_shared_frame/<run_name>/
+```
+
+## online_submap_mapping 中的角色
+
+300 步级别建图时，`shared_frame_alignment` 仍只负责局部刚体位姿：
+
+- source window 到 target batch 的 shared-frame coarse。
+- source window 到 active submap 的 bounded ICP 初值和微调。
+
+它不负责融合。融合由 `ConservativeVoxelHashFusion` 处理，并且只融合当前
+window 的非共享新增帧，避免共享帧在多个 batch 中被重复写入地图。完整流程见：
+
+```text
+docs/algorithms/online_submap_mapping.md
 ```
 
 ## 已知局限

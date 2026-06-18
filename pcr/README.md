@@ -41,8 +41,8 @@ p_target = T_source_to_target @ p_source
 使用 `pcr.domain.Transform` 保存矩阵时必须带上 `source` 和 `target`。例如：
 
 ```python
-T_source_to_target = Transform("batch_02", "batch_01", matrix)
-T_target_to_global = Transform("batch_01", "batch_01", np.eye(4))
+T_source_to_target = Transform("batch_002", "batch_001", matrix)
+T_target_to_global = Transform("batch_001", "global", np.eye(4))
 T_source_to_global = T_source_to_target.then(T_target_to_global)
 ```
 
@@ -64,6 +64,46 @@ T_source_to_global = T_source_to_target.then(T_target_to_global)
 6. `ArtifactStore` 写每步 overlay、matrix、metrics 和最终 summary。
 
 当前 fusion policy 是 `AppendVoxelFusion`，语义与旧 runner 一致：`world + registered_source` 后做 voxel downsample。后续重影过滤应作为新的 fusion policy 实现。
+
+## Online Submap 数据流
+
+`SubmapSequencePipeline` 是 300 步级别数据的在线建图入口。它不再把所有
+window 硬融合进一个全局 world，而是维护 active submap：
+
+1. baseline 初始化 `submap_000`。
+2. 每个 window 复用 `RegistrationStepPipeline` 做 dynamic top3 shared-frame coarse 和 bounded ICP。
+3. ICP target 使用 active submap 的 `local_cloud`。
+4. `quality_gate` 判断位姿和融合是否可信。
+5. 只从 DA3 `.npz` 中生成非共享新增帧点云，并复用所属 batch 的地板对齐矩阵。
+6. `ConservativeVoxelHashFusion` 将新增点分为 accepted / duplicate / conflict。
+7. active submap 满 `submap_size` 后，用最近 `submap_overlap` 个 batch 创建下一个 submap，并维护 `SubmapChain`。
+
+关键实现：
+
+```text
+pcr.pipeline.submap_sequence
+pcr.state.submap
+pcr.state.fusion.ConservativeVoxelHashFusion
+pcr.preprocessing.frame_cloud
+pcr.artifacts.submap_store
+pcr.app.run_submap_walkforward
+```
+
+配置生成：
+
+```bash
+.env/bin/python -m pcr.app.generate_submap_config \
+  --output testbench/configs/experiments/submap_walkforward_327.yaml
+```
+
+运行：
+
+```bash
+.env/bin/python testbench/run_submap_walkforward.py \
+  --config testbench/configs/experiments/submap_walkforward_327.yaml \
+  --run-name submap_327 \
+  --overwrite
+```
 
 ## 兼容入口
 
@@ -87,6 +127,7 @@ Pairwise 和参数 sweep 也遵循同样规则：
 ```text
 testbench/run_registration.py -> pcr.app.run_registration
 testbench/sweep_shared_frame_alignment.py -> pcr.app.sweep_shared_frame_alignment
+testbench/run_submap_walkforward.py -> pcr.app.run_submap_walkforward
 ```
 
 三类入口都复用 `pcr.algorithms.shared_frame` 中的 DA3 NPZ 读取、共享帧 correspondence、Kabsch/RANSAC/refit、candidate scoring，不再保留旧的重复数值实现。

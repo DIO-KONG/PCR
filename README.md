@@ -9,26 +9,26 @@
 基础统计：
 
 ```bash
-.env/bin/python -m pcr.preprocessing.preprocess da3/data/raw/pointcloud/batch_01_baseline_001-012.ply --print-stats
+.env/bin/python -m pcr.preprocessing.preprocess da3/data/raw/pointcloud/batch_001_baseline_001-012.ply --print-stats
 ```
 
 地板法线对齐到 `+Y`，并保存调试产物：
 
 ```bash
-.env/bin/python -m pcr.preprocessing.preprocess da3/data/raw/pointcloud/batch_01_baseline_001-012.ply \
-  --output result/preprocess/batch_01/aligned.ply \
+.env/bin/python -m pcr.preprocessing.preprocess da3/data/raw/pointcloud/batch_001_baseline_001-012.ply \
+  --output result/preprocess/batch_001/aligned.ply \
   --align-floor \
-  --write-debug result/preprocess/batch_01/debug
+  --write-debug result/preprocess/batch_001/debug
 ```
 
 地板对齐后去地板：
 
 ```bash
-.env/bin/python -m pcr.preprocessing.preprocess da3/data/raw/pointcloud/batch_01_baseline_001-012.ply \
-  --output result/preprocess/batch_01/floor_removed.ply \
+.env/bin/python -m pcr.preprocessing.preprocess da3/data/raw/pointcloud/batch_001_baseline_001-012.ply \
+  --output result/preprocess/batch_001/floor_removed.ply \
   --align-floor \
   --remove-floor \
-  --write-debug result/preprocess/batch_01_removed/debug
+  --write-debug result/preprocess/batch_001_removed/debug
 ```
 
 如果不显式指定 `--output`，只要执行了会产生新点云的处理步骤，CLI 会默认写入项目内基准目录：
@@ -40,7 +40,7 @@ result/preprocess/<输入文件stem>/
 例如：
 
 ```bash
-.env/bin/python -m pcr.preprocessing.preprocess da3/data/raw/pointcloud/batch_01_baseline_001-012.ply \
+.env/bin/python -m pcr.preprocessing.preprocess da3/data/raw/pointcloud/batch_001_baseline_001-012.ply \
   --align-floor \
   --write-debug
 ```
@@ -48,8 +48,8 @@ result/preprocess/<输入文件stem>/
 会生成：
 
 ```text
-result/preprocess/batch_01_baseline_001-012/aligned.ply
-result/preprocess/batch_01_baseline_001-012/debug/
+result/preprocess/batch_001_baseline_001-012/aligned.ply
+result/preprocess/batch_001_baseline_001-012/debug/
 ```
 
 地板检测不使用固定 `y_min/y_max` 高度阈值。当前策略是先迭代提取多个 RANSAC 平面，再根据法线是否接近 `Y` 轴、点数支持和面积估计选择最可信的地板候选。如果没有可信地板，CLI 会输出 `floor_not_found`，不会静默误删墙面或隔板。
@@ -73,7 +73,7 @@ result/preprocess/batch_01_baseline_001-012/debug/
 
 当前已实现第一个可控算法 `shared_frame_alignment`。它不是传统点云特征配准，而是利用 DA3 batch 之间共享 RGB-D 帧的同像素 3D 对应关系，估计 window batch 到 baseline batch 的刚体变换。当前实现保持刚体配准，不做 Sim(3) 尺度微调。
 
-这个算法适合当前第一步场景：`batch_02_window_009-013` 与 `batch_01_baseline_001-012` 共享 `9-rgb.png` 到 `12-rgb.png` 四帧。算法先把共享帧中同一像素通过各自 batch 的深度、内参、外参反投影到两个 batch 的局部 world，再用 RANSAC + Kabsch/SVD 估计 `window -> baseline` 的刚体矩阵。为了降低 DA3 置信像素差异、局部深度噪声和少量错误对应点的影响，当前版本会从 `0.12m`、`0.10m`、`0.08m`、`0.06m` 多个粗阈值生成候选，然后用逐步收紧的刚体 refit 精修，最终统一按 `0.06m` 统计指标。候选选定后还会执行一次有边界的 point-to-plane ICP，只允许小幅刚体微调；如果相对初值移动超过 `0.15m`、旋转超过 `5deg`，或明显破坏共享帧一致性，则自动回退。
+这个算法适合当前第一步场景：`batch_002_window_009-013` 与 `batch_001_baseline_001-012` 共享 `9.png` 到 `12.png` 四帧。算法先把共享帧中同一像素通过各自 batch 的深度、内参、外参反投影到两个 batch 的局部 world，再用 RANSAC + Kabsch/SVD 估计 `window -> baseline` 的刚体矩阵。为了降低 DA3 置信像素差异、局部深度噪声和少量错误对应点的影响，当前版本会从 `0.18m`、`0.14m`、`0.10m`、`0.06m` 多个粗阈值生成候选，然后用逐步收紧的刚体 refit 精修，最终统一按 `0.06m` 统计指标。候选选定后还会执行一次有边界的 point-to-plane ICP，只允许小幅刚体微调；如果相对初值移动超过 `0.15m`、旋转超过 `5deg`，则自动回退。
 
 运行第一步：
 
@@ -94,8 +94,8 @@ result/preprocess/batch_01_baseline_001-012/debug/
 默认输入为：
 
 ```text
-source: da3/data/raw/pointcloud/batch_02_window_009-013.ply
-target: da3/data/raw/pointcloud/batch_01_baseline_001-012.ply
+source: da3/data/raw/pointcloud/batch_002_window_009-013.ply
+target: da3/data/raw/pointcloud/batch_001_baseline_001-012.ply
 ```
 
 输出位于：
@@ -124,13 +124,54 @@ overlay.ply
 `shared_frame_alignment` 默认使用：
 
 ```text
-source_npz: da3/data/raw/pointcloud/batch_02_window_009-013.npz
-target_npz: da3/data/raw/pointcloud/batch_01_baseline_001-012.npz
-shared frames: 9-rgb.png, 10-rgb.png, 11-rgb.png, 12-rgb.png
+source_npz: da3/data/raw/pointcloud/batch_002_window_009-013.npz
+target_npz: da3/data/raw/pointcloud/batch_001_baseline_001-012.npz
+shared frames: 9.png, 10.png, 11.png, 12.png
 overlay clouds: result/preprocess/.../floor_removed.ply
 ```
 
 算法详细说明见 `docs/algorithms/shared_frame_alignment.md`。
+
+## 327 帧 DA3 预生成
+
+当前长序列输入图像命名为：
+
+```text
+da3/data/raw/image/1.png ... da3/data/raw/image/327.png
+```
+
+先验证 DA3 batch 枚举：
+
+```bash
+.env/bin/python da3/run_da3_batches.py \
+  --image-dir da3/data/raw/image \
+  --frame-start 1 \
+  --frame-end 327 \
+  --baseline-size 12 \
+  --window-size 5 \
+  --dry-run
+```
+
+预期生成 316 个 batch：`batch_001_baseline_001-012` 和
+`batch_002_window_009-013` 到 `batch_316_window_323-327`。
+
+批量生成 DA3 `.npz` 和 batch `.ply`：
+
+```bash
+.env/bin/python da3/run_da3_batches.py \
+  --image-dir da3/data/raw/image \
+  --output-dir da3/data/raw/pointcloud \
+  --frame-start 1 \
+  --frame-end 327 \
+  --baseline-size 12 \
+  --window-size 5 \
+  --conf-percentile 20 \
+  --skip-existing
+```
+
+`--skip-existing` 用于长时间任务断点续跑。若只想先生成后续算法依赖的
+`.npz`，可以加 `--npz-only`，但 online submap pipeline 仍需要 batch `.ply`
+来补齐 `result/preprocess/<batch>/floor_removed.ply`。
 
 ## 共享帧粗配准参数实验
 
@@ -215,3 +256,45 @@ step_*/coarse_overlay.ply
 step_*/bounded_icp_overlay.ply
 step_*/metrics.json
 ```
+
+## Online Submap 建图实验
+
+300 步级别数据不再推荐维护一个不断膨胀的单一 world。新的 online submap
+流程使用当前 active submap 做 bounded ICP target，只融合每个 window 的新增帧，
+并通过 Voxel Hash 抑制重复融合和冲突重影。
+
+生成 327 帧显式配置：
+
+```bash
+.env/bin/python -m pcr.app.generate_submap_config \
+  --output testbench/configs/experiments/submap_walkforward_327.yaml
+```
+
+运行：
+
+```bash
+.env/bin/python testbench/run_submap_walkforward.py \
+  --config testbench/configs/experiments/submap_walkforward_327.yaml \
+  --run-name submap_327 \
+  --overwrite
+```
+
+输出位于：
+
+```text
+result/submap_walkforward/<run_name>/
+```
+
+重点查看：
+
+```text
+summary.md
+submap_chain.json
+global_preview.ply
+submaps/*/local_world.ply
+steps/*/quality_report.json
+steps/*/fusion_report.json
+steps/*/fusion_debug/
+```
+
+详细流程见 `docs/algorithms/online_submap_mapping.md`。

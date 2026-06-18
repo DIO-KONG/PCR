@@ -3,6 +3,9 @@
 from .models import (
     BatchRef,
     EvaluationMetrics,
+    FusionDebugClouds,
+    FusionReport,
+    FusionResult,
     FrameSelection,
     FrameSelectionCandidate,
     IcpMetrics,
@@ -16,7 +19,12 @@ from .models import (
     RegistrationResult,
     RegistrationTask,
     SequenceTask,
+    QualityReport,
+    QualityStatus,
     StepResult,
+    SubmapEdge,
+    SubmapPipelineResult,
+    SubmapStepResult,
     WorldUpdateResult,
 )
 from .transforms import Transform
@@ -24,6 +32,9 @@ from .transforms import Transform
 __all__ = [
     "BatchRef",
     "EvaluationMetrics",
+    "FusionDebugClouds",
+    "FusionReport",
+    "FusionResult",
     "FrameSelection",
     "FrameSelectionCandidate",
     "IcpMetrics",
@@ -31,6 +42,8 @@ __all__ = [
     "PipelineResult",
     "PointCloudRef",
     "PointCloudRole",
+    "QualityReport",
+    "QualityStatus",
     "RefinementResult",
     "RegistrationCandidate",
     "RegistrationContext",
@@ -38,6 +51,9 @@ __all__ = [
     "RegistrationTask",
     "SequenceTask",
     "StepResult",
+    "SubmapEdge",
+    "SubmapPipelineResult",
+    "SubmapStepResult",
     "Transform",
     "WorldUpdateResult",
 ]

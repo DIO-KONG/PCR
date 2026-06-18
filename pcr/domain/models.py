@@ -23,6 +23,17 @@ class PointCloudRole(str, Enum):
     REGISTERED = "registered"
     WORLD = "world"
     OVERLAY = "overlay"
+    ACCEPTED = "accepted"
+    DUPLICATE = "duplicate"
+    CONFLICT = "conflict"
+
+
+class QualityStatus(str, Enum):
+    """质量门控状态。"""
+
+    ACCEPTED = "accepted"
+    NEEDS_REVIEW = "needs_review"
+    REJECTED = "rejected"
 
 
 @dataclass(frozen=True)
@@ -42,6 +53,69 @@ class BatchRef:
     npz_path: Path
     raw_cloud_path: Path
     preprocessed_cloud_path: Path
+
+
+@dataclass(frozen=True)
+class QualityReport:
+    """单步配准与融合质量门控结果。"""
+
+    pose_status: QualityStatus
+    fusion_status: QualityStatus
+    reasons: tuple[str, ...] = ()
+    metrics: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def pose_accepted(self) -> bool:
+        return self.pose_status != QualityStatus.REJECTED
+
+    @property
+    def fusion_accepted(self) -> bool:
+        return self.fusion_status == QualityStatus.ACCEPTED
+
+
+@dataclass(frozen=True)
+class FusionReport:
+    """一次保守融合的点分类统计。"""
+
+    accepted_points: int
+    duplicate_points: int
+    conflict_points: int
+    rejected_points: int
+    input_points: int
+    conflict_ratio: float
+    duplicate_ratio: float
+    accepted_ratio: float
+    new_frame_names: tuple[str, ...]
+    params: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class FusionDebugClouds:
+    """保守融合为了人工检查输出的三类点云。"""
+
+    accepted: o3d.geometry.PointCloud
+    duplicate: o3d.geometry.PointCloud
+    conflict: o3d.geometry.PointCloud
+
+
+@dataclass(frozen=True)
+class FusionResult:
+    """融合策略输出，不负责写 artifact。"""
+
+    fused_cloud: o3d.geometry.PointCloud
+    report: FusionReport
+    debug_clouds: FusionDebugClouds
+
+
+@dataclass(frozen=True)
+class SubmapEdge:
+    """相邻 submap 的位姿链边。"""
+
+    source_submap_id: str
+    target_submap_id: str
+    transform: Transform
+    status: str
+    reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -224,6 +298,30 @@ class WorldUpdateResult:
     fused_world: o3d.geometry.PointCloud
     fused_world_points: int
     world_stats: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class SubmapStepResult:
+    """submap pipeline 中单步配准、质量门控和融合的完整结果。"""
+
+    step_result: StepResult
+    quality: QualityReport
+    fusion: FusionResult | None
+    active_submap_id: str
+    world_before_step: o3d.geometry.PointCloud
+    frame_combo_rows: list[dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class SubmapPipelineResult:
+    """完整 online submap sequence 的结果。"""
+
+    run_name: str
+    run_dir: Path
+    steps: tuple[SubmapStepResult, ...]
+    submap_edges: tuple[SubmapEdge, ...]
+    final_submap_id: str
+    global_preview_points: int
 
 
 @dataclass

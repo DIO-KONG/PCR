@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""运行固定 Depth Anything 3 batch，并导出每个 batch 的融合点云。
+"""运行 Depth Anything 3 batch，并导出每个 batch 的预测与融合点云。
 
 这个脚本只负责“从 RGB 图像生成 DA3 局部 batch 结果”，不负责跨 batch 配准。
-跨 batch 配准和建图实验由 `testbench/run_experiment.py` 驱动。
+跨 batch 配准和建图实验由 `pcr/` 下的 pipeline 驱动。
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import numpy as np
 DEFAULT_MODEL = "depth-anything/DA3NESTED-GIANT-LARGE-1.1"
 DEFAULT_IMAGE_DIR = Path("da3/data/raw/image")
 DEFAULT_OUTPUT_DIR = Path("da3/data/raw/pointcloud")
-FRAME_RE = re.compile(r"^(\d+)-rgb\.png$")
+FRAME_RE = re.compile(r"^(\d+)(?:-rgb)?\.png$")
 
 
 @dataclass(frozen=True)
@@ -37,28 +37,50 @@ class BatchSpec:
     def stem(self) -> str:
         first = self.frames[0]
         last = self.frames[-1]
-        return f"batch_{self.index:02d}_{self.label}_{first:03d}-{last:03d}"
+        return f"batch_{self.index:03d}_{self.label}_{first:03d}-{last:03d}"
 
 
-def build_batches() -> list[BatchSpec]:
-    """构造当前项目固定的 DA3 batch 列表。
+def build_batches(
+    *,
+    frame_start: int,
+    frame_end: int,
+    baseline_size: int,
+    window_size: int,
+) -> list[BatchSpec]:
+    """构造 DA3 batch 列表。
 
-    baseline 使用 1..12 作为基准地图；后续窗口使用当前帧和前四步图像。
+    baseline 使用 `frame_start..frame_start+baseline_size-1` 初始化地图。
+    后续 window 使用“当前帧和前 `window_size-1` 帧”，例如 5 图 window
+    在第 13 帧时为 `9..13`。
     """
 
-    return [
-        BatchSpec(1, "baseline", tuple(range(1, 13))),
-        BatchSpec(2, "window", tuple(range(9, 14))),
-        BatchSpec(3, "window", tuple(range(10, 15))),
-        BatchSpec(4, "window", tuple(range(11, 16))),
-        BatchSpec(5, "window", tuple(range(12, 17))),
-        BatchSpec(6, "window", tuple(range(13, 18))),
-        BatchSpec(7, "window", tuple(range(14, 19))),
-    ]
+    if frame_end < frame_start:
+        raise ValueError(f"frame_end must be >= frame_start, got {frame_start}..{frame_end}")
+    if baseline_size < 1:
+        raise ValueError("--baseline-size must be >= 1")
+    if window_size < 2:
+        raise ValueError("--window-size must be >= 2")
+    baseline_last = frame_start + baseline_size - 1
+    if baseline_last > frame_end:
+        raise ValueError("Baseline range exceeds requested frame range.")
+
+    batches = [BatchSpec(1, "baseline", tuple(range(frame_start, baseline_last + 1)))]
+    batch_index = 2
+    for current_frame in range(baseline_last + 1, frame_end + 1):
+        first = current_frame - window_size + 1
+        if first < frame_start:
+            raise ValueError(f"Window {first}..{current_frame} starts before frame_start={frame_start}")
+        batches.append(BatchSpec(batch_index, "window", tuple(range(first, current_frame + 1))))
+        batch_index += 1
+    return batches
 
 
-def discover_images(image_dir: Path) -> dict[int, Path]:
-    """按数字前缀发现输入图像，并校验当前必须存在 1..18。"""
+def discover_images(image_dir: Path, *, frame_start: int, frame_end: int) -> dict[int, Path]:
+    """按数字前缀发现输入图像，并校验请求范围完整。
+
+    支持 `1.png` 和历史 `1-rgb.png` 两种命名。若同一帧同时存在两种文件，
+    优先报错，避免 DA3 batch 输入不稳定。
+    """
 
     if not image_dir.exists():
         raise FileNotFoundError(f"Image directory does not exist: {image_dir}")
@@ -73,14 +95,13 @@ def discover_images(image_dir: Path) -> dict[int, Path]:
             raise ValueError(f"Duplicate frame id {frame_id}: {frames[frame_id]} and {path}")
         frames[frame_id] = path
 
-    expected = set(range(1, 19))
+    expected = set(range(frame_start, frame_end + 1))
     actual = set(frames)
-    if actual != expected:
+    if not expected.issubset(actual):
         missing = sorted(expected - actual)
-        extra = sorted(actual - expected)
-        raise ValueError(f"Expected frames 1..18. Missing={missing}, extra={extra}")
+        raise ValueError(f"Missing requested frames {frame_start}..{frame_end}: {missing}")
 
-    return dict(sorted(frames.items()))
+    return {frame_id: frames[frame_id] for frame_id in sorted(expected)}
 
 
 def require_cuda() -> None:
@@ -273,13 +294,22 @@ def run(args: argparse.Namespace) -> None:
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    frames = discover_images(image_dir)
-    batches = build_batches()
+    frames = discover_images(image_dir, frame_start=args.frame_start, frame_end=args.frame_end)
+    batches = build_batches(
+        frame_start=args.frame_start,
+        frame_end=args.frame_end,
+        baseline_size=args.baseline_size,
+        window_size=args.window_size,
+    )
 
-    print("Discovered frames:", " ".join(str(frame) for frame in frames))
-    print("Configured batches:")
-    for batch in batches:
-        print(f"  {batch.stem}: {list(batch.frames)}")
+    print(f"Discovered {len(frames)} requested frames: {min(frames)}..{max(frames)}")
+    print(f"Configured {len(batches)} batches:")
+    preview = batches[:3] + ([] if len(batches) <= 6 else [BatchSpec(0, "...", tuple())]) + batches[-3:]
+    for batch in preview:
+        if batch.label == "...":
+            print("  ...")
+        else:
+            print(f"  {batch.stem}: {list(batch.frames)}")
 
     if args.dry_run:
         return
@@ -290,6 +320,12 @@ def run(args: argparse.Namespace) -> None:
 
     for batch in batches:
         image_paths = [frames[frame] for frame in batch.frames]
+        npz_path = output_dir / f"{batch.stem}.npz"
+        ply_path = output_dir / f"{batch.stem}.ply"
+        if args.skip_existing and npz_path.exists() and (args.npz_only or ply_path.exists()):
+            print(f"\nSkipping existing {batch.stem}")
+            continue
+
         print(f"\nRunning {batch.stem} with {len(image_paths)} images")
         prediction = model.inference(
             image=[str(path) for path in image_paths],
@@ -300,10 +336,11 @@ def run(args: argparse.Namespace) -> None:
         )
         arrays = prediction_to_arrays(prediction)
 
-        npz_path = output_dir / f"{batch.stem}.npz"
-        ply_path = output_dir / f"{batch.stem}.ply"
         save_prediction_npz(npz_path, image_paths, arrays)
+        print(f"  saved prediction: {npz_path}")
 
+        if args.npz_only:
+            continue
         cloud, before, after = make_point_cloud(
             arrays=arrays,
             conf_percentile=args.conf_percentile,
@@ -313,7 +350,6 @@ def run(args: argparse.Namespace) -> None:
         if not o3d.io.write_point_cloud(str(ply_path), cloud):
             raise RuntimeError(f"Open3D failed to write point cloud: {ply_path}")
 
-        print(f"  saved prediction: {npz_path}")
         print(f"  saved pointcloud: {ply_path}")
         print(f"  points: {before} before downsample, {after} after downsample")
 
@@ -325,11 +361,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-dir", type=Path, default=DEFAULT_IMAGE_DIR)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--frame-start", type=int, default=1)
+    parser.add_argument("--frame-end", type=int, default=327)
+    parser.add_argument("--baseline-size", type=int, default=12)
+    parser.add_argument("--window-size", type=int, default=5)
     parser.add_argument("--process-res", type=int, default=504)
     parser.add_argument("--process-res-method", default="upper_bound_resize")
     parser.add_argument("--conf-percentile", type=float, default=20.0)
     parser.add_argument("--point-stride", type=int, default=1)
     parser.add_argument("--voxel-size", type=float, default=0.01)
+    parser.add_argument("--skip-existing", action="store_true", help="Skip batches whose outputs already exist.")
+    parser.add_argument("--npz-only", action="store_true", help="Only save DA3 predictions, skip fused batch PLY output.")
     parser.add_argument("--dry-run", action="store_true", help="Validate image discovery and batches only.")
     args = parser.parse_args()
     if args.point_stride < 1:
