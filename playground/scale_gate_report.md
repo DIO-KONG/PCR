@@ -5,20 +5,38 @@ Run: `result/submap_walkforward/submap_327_align_only_se3`
 ## Candidate Gate
 
 ```text
-base_icp_suspect = icp_fitness < 0.55 and conflict_ratio > 0.55 and accepted_ratio > 0.05
-broad_accepted_region = accepted_xz_area > 25.0 and accepted_extent_max > 7.0
-scale_shadow_gate_v1 = base_icp_suspect and broad_accepted_region
+severe_scale_shadow = (
+  icp_fitness < 0.55
+  and conflict_ratio > 0.55
+  and accepted_ratio > 0.05
+  and accepted_xz_area > 25.0
+  and accepted_extent_max > 7.0
+)
+
+early_sparse_scale_shadow = (
+  icp_fitness < 0.65
+  and shared_p90_error < 0.10
+  and conflict_ratio > 0.55
+  and 0.015 < accepted_ratio < 0.05
+  and duplicate_ratio < 0.45
+  and accepted_xz_area > 15.0
+  and accepted_extent_max > 5.0
+)
+
+scale_shadow_gate_v2 = severe_scale_shadow or early_sparse_scale_shadow
 ```
 
-Rationale: the broad-region term separates submap_007 scale-shadow steps from early steps that also have low ICP fitness and high conflict, but whose accepted points are compact local additions.
+Rationale: the severe branch catches broad, high-accepted scale shadows. The early branch catches step 71 style failures where shared-frame alignment is still numerically plausible, but accepted points are already sparse, low-duplicate, and spatially broad.
 
 ## Hit Summary
 
 - Fusion attempts analyzed: 184
-- Gate hits: 16
+- Gate hits: 28
+- Severe hits: 16 (72, 73, 75, 76, 77, 148, 150, 151, 152, 164, 185, 186, 200, 207, 273, 289)
+- Early sparse hits: 12 (71, 110, 208, 211, 213, 214, 216, 218, 223, 254, 272, 274)
 - First 20 hits: 0 (none)
-- Step 71-80 hits: 5 (72, 73, 75, 76, 77)
-- Submap_007 hits: 5 (72, 73, 75, 76, 77)
+- Step 71-80 hits: 6 (71, 72, 73, 75, 76, 77)
+- Submap_007 hits: 6 (71, 72, 73, 75, 76, 77)
 
 ## First 20 Impact
 
@@ -35,7 +53,7 @@ Rationale: the broad-region term separates submap_007 scale-shadow steps from ea
 
 | step | submap | pose | fusion | p90 | fitness | accR | dupR | confR | xz_area | extent | gate |
 |---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
-| 71 | submap_007 | accepted | needs_review | 0.033 | 0.638 | 0.022 | 0.397 | 0.581 | 16.7 | 5.4 |  |
+| 71 | submap_007 | accepted | needs_review | 0.033 | 0.638 | 0.022 | 0.397 | 0.581 | 16.7 | 5.4 | yes |
 | 72 | submap_007 | accepted | needs_review | 0.066 | 0.539 | 0.112 | 0.178 | 0.710 | 45.6 | 8.4 | yes |
 | 73 | submap_007 | accepted | needs_review | 0.094 | 0.442 | 0.105 | 0.128 | 0.767 | 81.5 | 10.1 | yes |
 | 75 | submap_007 | needs_review | needs_review | 0.271 | 0.346 | 0.113 | 0.295 | 0.591 | 104.5 | 12.2 | yes |
@@ -48,11 +66,13 @@ Rationale: the broad-region term separates submap_007 scale-shadow steps from ea
 
 | step | submap | pose | fusion | p90 | fitness | accR | dupR | confR | xz_area | extent | gate |
 |---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| 71 | submap_007 | accepted | needs_review | 0.033 | 0.638 | 0.022 | 0.397 | 0.581 | 16.7 | 5.4 | yes |
 | 72 | submap_007 | accepted | needs_review | 0.066 | 0.539 | 0.112 | 0.178 | 0.710 | 45.6 | 8.4 | yes |
 | 73 | submap_007 | accepted | needs_review | 0.094 | 0.442 | 0.105 | 0.128 | 0.767 | 81.5 | 10.1 | yes |
 | 75 | submap_007 | needs_review | needs_review | 0.271 | 0.346 | 0.113 | 0.295 | 0.591 | 104.5 | 12.2 | yes |
 | 76 | submap_007 | needs_review | needs_review | 0.347 | 0.395 | 0.089 | 0.338 | 0.573 | 109.4 | 12.4 | yes |
 | 77 | submap_007 | needs_review | needs_review | 0.414 | 0.351 | 0.096 | 0.237 | 0.667 | 101.4 | 10.8 | yes |
+| 110 | submap_010 | accepted | needs_review | 0.036 | 0.471 | 0.033 | 0.281 | 0.686 | 32.0 | 6.0 | yes |
 | 148 | submap_014 | needs_review | needs_review | 1.213 | 0.020 | 0.354 | 0.000 | 0.646 | 36.2 | 7.1 | yes |
 | 150 | submap_014 | needs_review | needs_review | 0.716 | 0.099 | 0.082 | 0.193 | 0.726 | 47.2 | 7.0 | yes |
 | 151 | submap_015 | needs_review | needs_review | 0.122 | 0.212 | 0.127 | 0.110 | 0.762 | 64.9 | 9.0 | yes |
@@ -62,7 +82,17 @@ Rationale: the broad-region term separates submap_007 scale-shadow steps from ea
 | 186 | submap_018 | needs_review | needs_review | 0.164 | 0.340 | 0.103 | 0.142 | 0.755 | 119.1 | 12.3 | yes |
 | 200 | submap_019 | accepted | needs_review | 0.053 | 0.508 | 0.057 | 0.169 | 0.773 | 28.6 | 8.4 | yes |
 | 207 | submap_020 | needs_review | needs_review | 0.197 | 0.375 | 0.061 | 0.169 | 0.771 | 47.3 | 7.8 | yes |
+| 208 | submap_020 | accepted | needs_review | 0.079 | 0.453 | 0.019 | 0.152 | 0.829 | 67.8 | 8.2 | yes |
+| 211 | submap_021 | accepted | needs_review | 0.058 | 0.529 | 0.019 | 0.186 | 0.795 | 58.1 | 8.5 | yes |
+| 213 | submap_021 | accepted | needs_review | 0.079 | 0.555 | 0.019 | 0.140 | 0.841 | 80.7 | 9.1 | yes |
+| 214 | submap_021 | accepted | needs_review | 0.071 | 0.526 | 0.031 | 0.171 | 0.797 | 85.6 | 9.4 | yes |
+| 216 | submap_021 | accepted | needs_review | 0.067 | 0.570 | 0.019 | 0.374 | 0.607 | 59.7 | 9.5 | yes |
+| 218 | submap_021 | accepted | needs_review | 0.073 | 0.533 | 0.023 | 0.318 | 0.660 | 58.2 | 8.2 | yes |
+| 223 | submap_022 | accepted | needs_review | 0.076 | 0.534 | 0.023 | 0.416 | 0.561 | 21.2 | 5.1 | yes |
+| 254 | submap_025 | accepted | needs_review | 0.045 | 0.425 | 0.019 | 0.395 | 0.585 | 27.0 | 6.9 | yes |
+| 272 | submap_027 | accepted | needs_review | 0.011 | 0.440 | 0.018 | 0.190 | 0.792 | 54.6 | 8.9 | yes |
 | 273 | submap_027 | accepted | needs_review | 0.026 | 0.404 | 0.221 | 0.026 | 0.753 | 75.9 | 9.8 | yes |
+| 274 | submap_027 | accepted | needs_review | 0.023 | 0.507 | 0.024 | 0.252 | 0.723 | 64.5 | 9.9 | yes |
 | 289 | submap_028 | needs_review | needs_review | 0.367 | 0.139 | 0.144 | 0.096 | 0.760 | 156.4 | 14.5 | yes |
 
 ## Notes

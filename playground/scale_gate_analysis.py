@@ -47,9 +47,9 @@ class StepMetrics:
     accepted_linear_ratio: float
     accepted_planar_ratio: float
     accepted_thin_ratio: float
-    base_icp_suspect: bool
-    broad_accepted_region: bool
-    scale_shadow_gate_v1: bool
+    severe_scale_shadow: bool
+    early_sparse_scale_shadow: bool
+    scale_shadow_gate_v2: bool
 
 
 def load_json(path: Path) -> Any:
@@ -132,16 +132,28 @@ def build_metrics(run_dir: Path) -> list[StepMetrics]:
         metrics = quality["metrics"]
         geom = accepted_geometry_features(step_dir)
 
-        base_icp_suspect = (
+        # 严重尺度阴影：ICP 与融合冲突都已经明显异常，并且“本该新增”的点
+        # 在 XZ 平面形成大范围结构。这类规则抓住 step 72/73/75/76/77。
+        severe_scale_shadow = (
             float(metrics["icp_fitness"]) < 0.55
             and float(fusion["conflict_ratio"]) > 0.55
             and float(fusion["accepted_ratio"]) > 0.05
-        )
-        broad_accepted_region = (
-            geom["accepted_xz_area"] > 25.0
+            and geom["accepted_xz_area"] > 25.0
             and geom["accepted_extent_max"] > 7.0
         )
-        scale_shadow_gate_v1 = base_icp_suspect and broad_accepted_region
+        # 早期稀疏尺度阴影：shared-frame 误差还不错，ICP fitness 尚未很低，
+        # 但 accepted 点已经低比例、低 duplicate、大范围铺开。step 71 属于
+        # 这种“刚开始长出错误墙面”的状态。
+        early_sparse_scale_shadow = (
+            float(metrics["icp_fitness"]) < 0.65
+            and float(metrics["shared_p90_error"]) < 0.10
+            and float(fusion["conflict_ratio"]) > 0.55
+            and 0.015 < float(fusion["accepted_ratio"]) < 0.05
+            and float(fusion["duplicate_ratio"]) < 0.45
+            and geom["accepted_xz_area"] > 15.0
+            and geom["accepted_extent_max"] > 5.0
+        )
+        scale_shadow_gate_v2 = severe_scale_shadow or early_sparse_scale_shadow
 
         rows.append(
             StepMetrics(
@@ -173,9 +185,9 @@ def build_metrics(run_dir: Path) -> list[StepMetrics]:
                 accepted_linear_ratio=geom["accepted_linear_ratio"],
                 accepted_planar_ratio=geom["accepted_planar_ratio"],
                 accepted_thin_ratio=geom["accepted_thin_ratio"],
-                base_icp_suspect=base_icp_suspect,
-                broad_accepted_region=broad_accepted_region,
-                scale_shadow_gate_v1=scale_shadow_gate_v1,
+                severe_scale_shadow=severe_scale_shadow,
+                early_sparse_scale_shadow=early_sparse_scale_shadow,
+                scale_shadow_gate_v2=scale_shadow_gate_v2,
             )
         )
     return rows
@@ -185,7 +197,7 @@ def write_csv(path: Path, rows: list[StepMetrics]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = list(StepMetrics.__dataclass_fields__.keys())
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow(row.__dict__)
@@ -215,7 +227,7 @@ def markdown_table(rows: list[StepMetrics], *, limit: int | None = None) -> list
                 conf=row.conflict_ratio,
                 area=row.accepted_xz_area,
                 extent=row.accepted_extent_max,
-                gate="yes" if row.scale_shadow_gate_v1 else "",
+                gate="yes" if row.scale_shadow_gate_v2 else "",
             )
         )
     return lines
@@ -223,13 +235,15 @@ def markdown_table(rows: list[StepMetrics], *, limit: int | None = None) -> list
 
 def write_report(path: Path, rows: list[StepMetrics], run_dir: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    hits = [row for row in rows if row.scale_shadow_gate_v1]
+    hits = [row for row in rows if row.scale_shadow_gate_v2]
     pre20 = [row for row in rows if row.step <= 20]
-    pre20_hits = [row for row in pre20 if row.scale_shadow_gate_v1]
+    pre20_hits = [row for row in pre20 if row.scale_shadow_gate_v2]
     submap7 = [row for row in rows if row.submap == "submap_007"]
-    submap7_hits = [row for row in submap7 if row.scale_shadow_gate_v1]
+    submap7_hits = [row for row in submap7 if row.scale_shadow_gate_v2]
     step71_80 = [row for row in rows if 71 <= row.step <= 80]
-    step71_80_hits = [row for row in step71_80 if row.scale_shadow_gate_v1]
+    step71_80_hits = [row for row in step71_80 if row.scale_shadow_gate_v2]
+    severe_hits = [row for row in hits if row.severe_scale_shadow]
+    early_hits = [row for row in hits if row.early_sparse_scale_shadow]
 
     lines = [
         "# Scale Gate Analysis",
@@ -239,17 +253,35 @@ def write_report(path: Path, rows: list[StepMetrics], run_dir: Path) -> None:
         "## Candidate Gate",
         "",
         "```text",
-        "base_icp_suspect = icp_fitness < 0.55 and conflict_ratio > 0.55 and accepted_ratio > 0.05",
-        "broad_accepted_region = accepted_xz_area > 25.0 and accepted_extent_max > 7.0",
-        "scale_shadow_gate_v1 = base_icp_suspect and broad_accepted_region",
+        "severe_scale_shadow = (",
+        "  icp_fitness < 0.55",
+        "  and conflict_ratio > 0.55",
+        "  and accepted_ratio > 0.05",
+        "  and accepted_xz_area > 25.0",
+        "  and accepted_extent_max > 7.0",
+        ")",
+        "",
+        "early_sparse_scale_shadow = (",
+        "  icp_fitness < 0.65",
+        "  and shared_p90_error < 0.10",
+        "  and conflict_ratio > 0.55",
+        "  and 0.015 < accepted_ratio < 0.05",
+        "  and duplicate_ratio < 0.45",
+        "  and accepted_xz_area > 15.0",
+        "  and accepted_extent_max > 5.0",
+        ")",
+        "",
+        "scale_shadow_gate_v2 = severe_scale_shadow or early_sparse_scale_shadow",
         "```",
         "",
-        "Rationale: the broad-region term separates submap_007 scale-shadow steps from early steps that also have low ICP fitness and high conflict, but whose accepted points are compact local additions.",
+        "Rationale: the severe branch catches broad, high-accepted scale shadows. The early branch catches step 71 style failures where shared-frame alignment is still numerically plausible, but accepted points are already sparse, low-duplicate, and spatially broad.",
         "",
         "## Hit Summary",
         "",
         f"- Fusion attempts analyzed: {len(rows)}",
         f"- Gate hits: {len(hits)}",
+        f"- Severe hits: {len(severe_hits)} ({fmt_steps(severe_hits)})",
+        f"- Early sparse hits: {len(early_hits)} ({fmt_steps(early_hits)})",
         f"- First 20 hits: {len(pre20_hits)} ({fmt_steps(pre20_hits)})",
         f"- Step 71-80 hits: {len(step71_80_hits)} ({fmt_steps(step71_80_hits)})",
         f"- Submap_007 hits: {len(submap7_hits)} ({fmt_steps(submap7_hits)})",
@@ -291,9 +323,9 @@ def main() -> None:
     rows = build_metrics(args.run_dir)
     write_csv(args.output_dir / "scale_gate_metrics.csv", rows)
     write_report(args.output_dir / "scale_gate_report.md", rows, args.run_dir)
-    hits = [row for row in rows if row.scale_shadow_gate_v1]
-    pre20_hits = [row for row in rows if row.step <= 20 and row.scale_shadow_gate_v1]
-    submap7_hits = [row for row in rows if row.submap == "submap_007" and row.scale_shadow_gate_v1]
+    hits = [row for row in rows if row.scale_shadow_gate_v2]
+    pre20_hits = [row for row in rows if row.step <= 20 and row.scale_shadow_gate_v2]
+    submap7_hits = [row for row in rows if row.submap == "submap_007" and row.scale_shadow_gate_v2]
     print(f"analyzed={len(rows)} hits={len(hits)} pre20_hits={fmt_steps(pre20_hits)} submap7_hits={fmt_steps(submap7_hits)}")
     print(f"wrote {args.output_dir / 'scale_gate_metrics.csv'}")
     print(f"wrote {args.output_dir / 'scale_gate_report.md'}")
