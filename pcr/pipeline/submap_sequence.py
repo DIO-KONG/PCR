@@ -95,6 +95,7 @@ class SubmapSequencePipeline:
                     max_points_per_frame=fusion_config.get("max_points_per_frame"),
                     random_seed=int(fusion_config.get("random_seed", sampling.get("random_seed", 7))),
                     floor_distance_threshold=float(fusion_config.get("floor_distance_threshold", 0.03)),
+                    remove_floor=self.preprocess_service.remove_floor,
                 )
                 incoming = step_result.final_transform.apply_cloud(frame_cloud)
                 fusion_result = active.fusion.fuse(

@@ -13,22 +13,38 @@ def batch_stem(index: int, label: str, first: int, last: int) -> str:
     return f"batch_{index:03d}_{label}_{first:03d}-{last:03d}"
 
 
-def batch_ref(stem: str) -> dict[str, str]:
+def batch_ref(stem: str, *, preprocess_mode: str) -> dict[str, str]:
     """生成配置中的 batch 文件路径。"""
+
+    if preprocess_mode == "floor_removed":
+        cloud_path = f"result/preprocess/{stem}/floor_removed.ply"
+    elif preprocess_mode == "align_only":
+        cloud_path = f"result/preprocess_align_only/{stem}/aligned.ply"
+    else:
+        raise ValueError(f"Unsupported preprocess mode: {preprocess_mode}")
 
     return {
         "npz": f"da3/data/raw/pointcloud/{stem}.npz",
         "raw_cloud": f"da3/data/raw/pointcloud/{stem}.ply",
-        "cloud": f"result/preprocess/{stem}/floor_removed.ply",
+        "cloud": cloud_path,
     }
 
 
-def build_config(*, frame_start: int, frame_end: int, baseline_size: int, window_size: int) -> dict[str, Any]:
+def build_config(
+    *,
+    frame_start: int,
+    frame_end: int,
+    baseline_size: int,
+    window_size: int,
+    preprocess_mode: str,
+    icp_method: str,
+    max_scale_delta: float,
+) -> dict[str, Any]:
     """生成 online submap walk-forward YAML 内容。"""
 
     baseline_last = frame_start + baseline_size - 1
     baseline_stem = batch_stem(1, "baseline", frame_start, baseline_last)
-    baseline = {"id": baseline_stem, **batch_ref(baseline_stem)}
+    baseline = {"id": baseline_stem, **batch_ref(baseline_stem, preprocess_mode=preprocess_mode)}
 
     steps: list[dict[str, Any]] = []
     previous_stem = baseline_stem
@@ -37,8 +53,8 @@ def build_config(*, frame_start: int, frame_end: int, baseline_size: int, window
     for current_frame in range(baseline_last + 1, frame_end + 1):
         first = current_frame - window_size + 1
         source_stem = batch_stem(batch_index, "window", first, current_frame)
-        source = batch_ref(source_stem)
-        target = batch_ref(previous_stem)
+        source = batch_ref(source_stem, preprocess_mode=preprocess_mode)
+        target = batch_ref(previous_stem, preprocess_mode=preprocess_mode)
         steps.append(
             {
                 "id": f"step_{step_index:03d}_{source_stem}_to_{previous_stem}",
@@ -56,11 +72,35 @@ def build_config(*, frame_start: int, frame_end: int, baseline_size: int, window
         batch_index += 1
         step_index += 1
 
+    remove_floor = preprocess_mode == "floor_removed"
+    icp_config: dict[str, Any] = {
+        "voxel_size": 0.06,
+        "max_correspondence_distance": 0.08,
+        "normal_radius": 0.18,
+        "normal_max_nn": 30,
+        "max_iteration": 40,
+        "max_translation_delta": 0.15,
+        "max_rotation_delta_deg": 5.0,
+        "method": icp_method,
+    }
+    if icp_method == "sim3_point_to_point":
+        icp_config.update(
+            {
+                "max_scale_delta": float(max_scale_delta),
+                "min_correspondences": 80,
+                "sim3_convergence_rmse_delta": 1.0e-5,
+            }
+        )
+
     return {
         "name": "online_submap_walkforward_327",
         "result_root": "result/submap_walkforward",
         "baseline": baseline,
         "steps": steps,
+        "preprocess": {
+            "align_floor": True,
+            "remove_floor": remove_floor,
+        },
         "submap": {
             "submap_size": 10,
             "submap_overlap": 3,
@@ -112,13 +152,7 @@ def build_config(*, frame_start: int, frame_end: int, baseline_size: int, window
                 "min_points": 200,
             },
             "icp": {
-                "voxel_size": 0.06,
-                "max_correspondence_distance": 0.08,
-                "normal_radius": 0.18,
-                "normal_max_nn": 30,
-                "max_iteration": 40,
-                "max_translation_delta": 0.15,
-                "max_rotation_delta_deg": 5.0,
+                **icp_config,
             },
         },
     }
@@ -131,6 +165,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--frame-end", type=int, default=327)
     parser.add_argument("--baseline-size", type=int, default=12)
     parser.add_argument("--window-size", type=int, default=5)
+    parser.add_argument(
+        "--preprocess-mode",
+        choices=("floor_removed", "align_only"),
+        default="floor_removed",
+        help="floor_removed removes the detected floor; align_only keeps floor points after floor alignment.",
+    )
+    parser.add_argument(
+        "--icp-method",
+        choices=("point_to_plane_icp", "sim3_point_to_point"),
+        default="point_to_plane_icp",
+    )
+    parser.add_argument("--max-scale-delta", type=float, default=0.08)
     return parser.parse_args(argv)
 
 
@@ -141,6 +187,9 @@ def main(argv: list[str] | None = None) -> None:
         frame_end=args.frame_end,
         baseline_size=args.baseline_size,
         window_size=args.window_size,
+        preprocess_mode=args.preprocess_mode,
+        icp_method=args.icp_method,
+        max_scale_delta=args.max_scale_delta,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(yaml.safe_dump(config, allow_unicode=True, sort_keys=False), encoding="utf-8")

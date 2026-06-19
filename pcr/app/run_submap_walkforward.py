@@ -10,6 +10,7 @@ from pcr.artifacts.store import json_safe
 from pcr.artifacts.submap_store import SubmapArtifactStore
 from pcr.config.loader import build_sequence_task, load_yaml
 from pcr.pipeline.submap_sequence import SubmapSequencePipeline
+from pcr.preprocessing.pipeline import PreprocessService
 
 
 DEFAULT_CONFIG = Path("testbench/configs/experiments/submap_walkforward_327.yaml")
@@ -36,7 +37,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     store.initialize(config=config, overwrite=bool(args.overwrite))
 
     task = build_sequence_task(config)
-    output = SubmapSequencePipeline().run(
+    preprocess_service = PreprocessService.from_config(config.get("preprocess"))
+    output = SubmapSequencePipeline(preprocess_service=preprocess_service).run(
         task=task,
         config=config,
         run_name=run_name,

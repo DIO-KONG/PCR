@@ -33,16 +33,18 @@ def apply_batch_preprocess_to_frame(
     report: dict[str, Any],
     *,
     floor_distance_threshold: float = 0.03,
+    remove_floor: bool = True,
 ) -> o3d.geometry.PointCloud:
-    """把原始 DA3 单帧点云转换到 batch floor-removed 坐标系。
+    """把原始 DA3 单帧点云转换到 batch 预处理坐标系。
 
-    处理顺序与 `preprocess_for_registration(align_floor=True, remove_floor=True)` 保持一致：
-    先按原始 batch 坐标中的地板平面删除地板，再应用 batch 的 floor alignment matrix。
+    处理顺序必须与 batch PLY 的预处理保持一致：floor-removed 模式先按原始
+    batch 坐标中的地板平面删除地板，再应用 floor alignment matrix；align-only
+    模式只应用同一个 alignment matrix，保留地板点参与融合。
     """
 
     result = o3d.geometry.PointCloud(cloud)
     floor_payload = report.get("floor_detection", {}).get("floor")
-    if floor_payload:
+    if remove_floor and floor_payload:
         _, result = remove_floor_by_plane(
             result,
             PlaneCandidate(**floor_payload),
@@ -64,8 +66,9 @@ def build_new_frame_clouds(
     max_points_per_frame: int | None,
     random_seed: int,
     floor_distance_threshold: float = 0.03,
+    remove_floor: bool = True,
 ) -> tuple[o3d.geometry.PointCloud, tuple[str, ...]]:
-    """从 source batch 中构造“非共享新增帧”的 floor-removed 点云。
+    """从 source batch 中构造“非共享新增帧”的预处理点云。
 
     对 5 图 window，相邻 target 通常共享前 4 帧；本函数自动用 image name
     差集找新增帧，因此也兼容 baseline/window 命名从 `9-rgb.png` 切到 `9.png`。
@@ -96,6 +99,7 @@ def build_new_frame_clouds(
             raw_cloud,
             report,
             floor_distance_threshold=floor_distance_threshold,
+            remove_floor=remove_floor,
         )
         if not processed.is_empty():
             merged += processed
