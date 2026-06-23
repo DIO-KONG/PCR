@@ -140,6 +140,33 @@ def make_debug_cloud(points: list[np.ndarray], colors: list[np.ndarray], paint: 
     return cloud
 
 
+def accepted_geometry_params(points: list[np.ndarray]) -> dict[str, float]:
+    """计算 accepted 点云的空间覆盖范围，供尺度阴影 gate 使用。
+
+    尺度错误导致的重影常表现为：真正写入的新点比例不一定特别高，但这些点
+    在 XZ 平面铺开很远，像一层错误墙面或墙角。该函数只描述形态，不直接
+    决策是否融合。
+    """
+
+    if len(points) < 3:
+        return {
+            "accepted_extent_x": 0.0,
+            "accepted_extent_y": 0.0,
+            "accepted_extent_z": 0.0,
+            "accepted_extent_max": 0.0,
+            "accepted_xz_area": 0.0,
+        }
+    array = np.asarray(points, dtype=float)
+    extent = array.max(axis=0) - array.min(axis=0)
+    return {
+        "accepted_extent_x": float(extent[0]),
+        "accepted_extent_y": float(extent[1]),
+        "accepted_extent_z": float(extent[2]),
+        "accepted_extent_max": float(extent.max()),
+        "accepted_xz_area": float(max(extent[0], 1e-9) * max(extent[2], 1e-9)),
+    }
+
+
 @dataclass
 class ConservativeVoxelHashFusion:
     """保守 Voxel Hash 融合。
@@ -173,6 +200,7 @@ class ConservativeVoxelHashFusion:
         incoming_cloud: o3d.geometry.PointCloud,
         step_index: int,
         new_frame_names: tuple[str, ...],
+        commit: bool = True,
     ) -> FusionResult:
         incoming = ensure_normals(incoming_cloud, radius=self.normal_radius, max_nn=self.normal_max_nn)
         map_cloud = self.voxel_map.to_cloud()
@@ -186,8 +214,10 @@ class ConservativeVoxelHashFusion:
 
         accepted_points: list[np.ndarray] = []
         accepted_colors: list[np.ndarray] = []
+        accepted_normals: list[np.ndarray] = []
         duplicate_points: list[np.ndarray] = []
         duplicate_colors: list[np.ndarray] = []
+        duplicate_normals: list[np.ndarray] = []
         conflict_points: list[np.ndarray] = []
         conflict_colors: list[np.ndarray] = []
 
@@ -196,16 +226,16 @@ class ConservativeVoxelHashFusion:
 
         for point, color, normal in zip(source_points, source_colors, source_normals, strict=False):
             if tree is None:
-                self.voxel_map.insert_or_update(point, color, normal, step_index=step_index)
                 accepted_points.append(point)
                 accepted_colors.append(color)
+                accepted_normals.append(normal)
                 continue
 
             count, indices, distances = tree.search_knn_vector_3d(point, 1)
             if count == 0:
-                self.voxel_map.insert_or_update(point, color, normal, step_index=step_index)
                 accepted_points.append(point)
                 accepted_colors.append(color)
+                accepted_normals.append(normal)
                 continue
 
             nearest_index = int(indices[0])
@@ -215,16 +245,22 @@ class ConservativeVoxelHashFusion:
                 normal_ok = abs(float(np.dot(normal, map_normals[nearest_index]))) >= cos_threshold
 
             if distance <= self.duplicate_distance and normal_ok:
-                self.voxel_map.insert_or_update(point, color, normal, step_index=step_index)
                 duplicate_points.append(point)
                 duplicate_colors.append(color)
+                duplicate_normals.append(normal)
             elif distance <= self.conflict_distance or not normal_ok:
                 conflict_points.append(point)
                 conflict_colors.append(color)
             else:
-                self.voxel_map.insert_or_update(point, color, normal, step_index=step_index)
                 accepted_points.append(point)
                 accepted_colors.append(color)
+                accepted_normals.append(normal)
+
+        if commit:
+            for point, color, normal in zip(accepted_points, accepted_colors, accepted_normals, strict=False):
+                self.voxel_map.insert_or_update(point, color, normal, step_index=step_index)
+            for point, color, normal in zip(duplicate_points, duplicate_colors, duplicate_normals, strict=False):
+                self.voxel_map.insert_or_update(point, color, normal, step_index=step_index)
 
         input_count = int(len(source_points))
         accepted_count = int(len(accepted_points))
@@ -246,6 +282,8 @@ class ConservativeVoxelHashFusion:
                 "duplicate_distance": self.duplicate_distance,
                 "conflict_distance": self.conflict_distance,
                 "normal_angle_deg": self.normal_angle_deg,
+                "committed": commit,
+                **accepted_geometry_params(accepted_points),
             },
         )
         return FusionResult(

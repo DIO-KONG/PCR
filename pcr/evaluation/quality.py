@@ -5,6 +5,15 @@ from typing import Any
 from pcr.domain import FusionReport, QualityReport, QualityStatus, StepResult
 
 
+def config_bool(config: dict[str, Any], key: str, default: bool = False) -> bool:
+    """从 YAML 配置读取布尔值，避免字符串 `"false"` 被当作 True。"""
+
+    value = config.get(key, default)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
+
+
 def evaluate_pose_quality(step: StepResult, config: dict[str, Any]) -> QualityReport:
     """根据共享帧与 ICP 指标判断当前位姿是否可信。
 
@@ -68,20 +77,50 @@ def apply_fusion_quality(
 
     reasons = list(pose_report.reasons)
     metrics = dict(pose_report.metrics)
+    fusion_params = dict(fusion_report.params)
     metrics.update(
         {
             "fusion_conflict_ratio": fusion_report.conflict_ratio,
+            "fusion_duplicate_ratio": fusion_report.duplicate_ratio,
+            "fusion_accepted_ratio": fusion_report.accepted_ratio,
             "fusion_accepted_points": fusion_report.accepted_points,
             "fusion_duplicate_points": fusion_report.duplicate_points,
             "fusion_conflict_points": fusion_report.conflict_points,
             "fusion_input_points": fusion_report.input_points,
+            "fusion_accepted_xz_area": fusion_params.get("accepted_xz_area", 0.0),
+            "fusion_accepted_extent_max": fusion_params.get("accepted_extent_max", 0.0),
         }
     )
     max_conflict_ratio = float(config.get("max_conflict_ratio", 0.30))
     if fusion_report.conflict_ratio > max_conflict_ratio:
         reasons.append("fusion_conflict_ratio_too_high")
 
+    scale_gate_enabled = config_bool(config, "enable_scale_shadow_gate", False)
+    severe_scale_shadow = (
+        fusion_report.conflict_ratio > float(config.get("scale_shadow_min_conflict_ratio", 0.55))
+        and fusion_report.accepted_ratio > float(config.get("scale_shadow_severe_min_accepted_ratio", 0.05))
+        and metrics["icp_fitness"] < float(config.get("scale_shadow_severe_max_icp_fitness", 0.55))
+        and float(metrics["fusion_accepted_xz_area"]) > float(config.get("scale_shadow_severe_min_xz_area", 25.0))
+        and float(metrics["fusion_accepted_extent_max"]) > float(config.get("scale_shadow_severe_min_extent", 7.0))
+    )
+    early_sparse_scale_shadow = (
+        fusion_report.conflict_ratio > float(config.get("scale_shadow_min_conflict_ratio", 0.55))
+        and float(config.get("scale_shadow_early_min_accepted_ratio", 0.015)) < fusion_report.accepted_ratio < float(config.get("scale_shadow_early_max_accepted_ratio", 0.05))
+        and fusion_report.duplicate_ratio < float(config.get("scale_shadow_early_max_duplicate_ratio", 0.45))
+        and metrics["icp_fitness"] < float(config.get("scale_shadow_early_max_icp_fitness", 0.65))
+        and metrics["shared_p90_error"] < float(config.get("scale_shadow_early_max_shared_p90_error", 0.10))
+        and float(metrics["fusion_accepted_xz_area"]) > float(config.get("scale_shadow_early_min_xz_area", 15.0))
+        and float(metrics["fusion_accepted_extent_max"]) > float(config.get("scale_shadow_early_min_extent", 5.0))
+    )
+    metrics["fusion_severe_scale_shadow"] = severe_scale_shadow
+    metrics["fusion_early_sparse_scale_shadow"] = early_sparse_scale_shadow
+    scale_shadow_quarantined = scale_gate_enabled and (severe_scale_shadow or early_sparse_scale_shadow)
+    if scale_shadow_quarantined:
+        reasons.append("fusion_scale_shadow_quarantined")
+
     if pose_report.pose_status == QualityStatus.REJECTED:
+        fusion_status = QualityStatus.REJECTED
+    elif scale_shadow_quarantined:
         fusion_status = QualityStatus.REJECTED
     elif fusion_report.conflict_ratio > max_conflict_ratio:
         # fusion 采用点级过滤：accepted 写入、duplicate 更新、conflict 丢弃。

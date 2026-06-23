@@ -6,6 +6,7 @@ import numpy as np
 import open3d as o3d
 
 from pcr.domain import SubmapEdge, Transform
+from pcr.algorithms.shared_frame.geometry import rotation_angle_deg
 from pcr.state.fusion import ConservativeVoxelHashFusion
 
 
@@ -28,6 +29,11 @@ class SubmapState:
     fused_batch_order: list[str] = field(default_factory=list)
     provisional_batch_order: list[str] = field(default_factory=list)
     batch_order: list[str] = field(default_factory=list)
+    provisional_depths: dict[str, int] = field(default_factory=dict)
+    fusion_step_history: list[bool] = field(default_factory=list)
+    pose_rejected_history: list[bool] = field(default_factory=list)
+    scale_quarantine_history: list[bool] = field(default_factory=list)
+    rotation_hold_reason: str = ""
     step_count: int = 0
 
     @property
@@ -47,19 +53,25 @@ class SubmapState:
         """
 
         self.transforms_to_submap[batch_id] = transform
+        self.provisional_depths.pop(batch_id, None)
         if batch_id not in self.registered_batch_order:
             self.registered_batch_order.append(batch_id)
+        if batch_id in self.provisional_batch_order:
+            self.provisional_batch_order.remove(batch_id)
         if batch_id not in self.batch_order:
             self.batch_order.append(batch_id)
 
-    def remember_provisional_batch(self, batch_id: str, transform: Transform) -> None:
+    def remember_provisional_batch(self, batch_id: str, transform: Transform, *, depth: int) -> None:
         """记录 pose rejected 的临时位姿。
 
         这只用于让下一步相邻 batch 还能组合初值继续试算；它不会进入
-        registered/fused，也不会作为 overlap seed。
+        registered/fused，也不会作为 overlap seed。`depth` 表示这个临时位姿
+        已经从最近可信 transform 传播了多少步，后续质量门控会限制它继续污染
+        地图。
         """
 
         self.transforms_to_submap[batch_id] = transform
+        self.provisional_depths[batch_id] = int(depth)
         if batch_id not in self.provisional_batch_order:
             self.provisional_batch_order.append(batch_id)
         if batch_id not in self.batch_order:
@@ -68,10 +80,33 @@ class SubmapState:
     def remember_fused_batch(self, batch_id: str) -> None:
         """记录 fusion accepted 的 batch，可用于 overlap seed。"""
 
+        self.provisional_depths.pop(batch_id, None)
+        if batch_id in self.provisional_batch_order:
+            self.provisional_batch_order.remove(batch_id)
         if batch_id not in self.fused_batch_order:
             self.fused_batch_order.append(batch_id)
         if batch_id not in self.batch_order:
             self.batch_order.append(batch_id)
+
+    def provisional_depth(self, batch_id: str) -> int:
+        """返回 batch 的 provisional 传播深度；可信 batch 深度为 0。"""
+
+        return int(self.provisional_depths.get(batch_id, 0))
+
+    def record_step_outcome(self, *, committed_fusion: bool, pose_rejected: bool, scale_quarantined: bool) -> None:
+        """记录当前 submap 内的真实增长情况，用于质量驱动切换。"""
+
+        self.fusion_step_history.append(bool(committed_fusion))
+        self.pose_rejected_history.append(bool(pose_rejected))
+        self.scale_quarantine_history.append(bool(scale_quarantined))
+
+    def steps_since_last_fusion(self) -> int:
+        """距离最近一次实际写入 voxel map 的步数。"""
+
+        for offset, item in enumerate(reversed(self.fusion_step_history), start=0):
+            if item:
+                return offset
+        return len(self.fusion_step_history)
 
 
 @dataclass
@@ -106,6 +141,14 @@ class SubmapManager:
     submap_size: int
     submap_overlap: int
     fusion_config: dict
+    min_submap_steps: int = 8
+    max_submap_steps: int = 20
+    min_fused_batches_for_rotation: int = 5
+    recent_fusion_window: int = 6
+    min_recent_fused_for_rotation: int = 2
+    max_steps_since_fused_for_rotation: int = 6
+    max_submap_edge_translation: float = 5.0
+    max_submap_edge_rotation_deg: float = 180.0
     submaps: list[SubmapState] = field(default_factory=list)
     chain: SubmapChain | None = None
 
@@ -122,6 +165,7 @@ class SubmapManager:
             fused_batch_order=[baseline_id],
             provisional_batch_order=[],
             batch_order=[baseline_id],
+            provisional_depths={},
         )
         self.submaps = [submap]
         self.chain = SubmapChain.initialize(submap_id)
@@ -134,7 +178,30 @@ class SubmapManager:
         return self.submaps[-1]
 
     def should_rotate(self) -> bool:
-        return self.active.step_count >= int(self.submap_size)
+        active = self.active
+        if active.step_count < int(self.submap_size):
+            active.rotation_hold_reason = ""
+            return False
+        recent = active.fusion_step_history[-int(self.recent_fusion_window) :]
+        fused_count = int(sum(active.fusion_step_history))
+        recent_fused = int(sum(recent))
+        steps_since_fused = active.steps_since_last_fusion()
+        enough_growth = (
+            active.step_count >= int(self.min_submap_steps)
+            and fused_count >= int(self.min_fused_batches_for_rotation)
+            and recent_fused >= int(self.min_recent_fused_for_rotation)
+            and steps_since_fused <= int(self.max_steps_since_fused_for_rotation)
+        )
+        if enough_growth:
+            active.rotation_hold_reason = ""
+            return True
+        if active.step_count >= int(self.max_submap_steps):
+            active.rotation_hold_reason = (
+                "hold_rotation_without_reliable_fusion:"
+                f"steps={active.step_count},fused={fused_count},"
+                f"recent_fused={recent_fused},steps_since_fused={steps_since_fused}"
+            )
+        return False
 
     def rotate_if_needed(self, batch_cloud_paths: dict[str, str]) -> SubmapState:
         if not self.should_rotate():
@@ -149,6 +216,18 @@ class SubmapManager:
 
         anchor_batch = seed_batches[-1]
         anchor_to_previous = previous.transform_to_submap(anchor_batch)
+        edge_translation = float(np.linalg.norm(anchor_to_previous.matrix[:3, 3]))
+        edge_rotation = rotation_angle_deg(anchor_to_previous.matrix[:3, :3])
+        if (
+            edge_translation > float(self.max_submap_edge_translation)
+            or edge_rotation > float(self.max_submap_edge_rotation_deg)
+        ):
+            previous.rotation_hold_reason = (
+                "hold_rotation_edge_sanity_failed:"
+                f"anchor={anchor_batch},translation={edge_translation:.3f},rotation_deg={edge_rotation:.3f}"
+            )
+            return previous
+
         previous_to_anchor = anchor_to_previous.inverse()
         new_index = len(self.submaps)
         new_submap_id = f"submap_{new_index:03d}"
@@ -157,6 +236,7 @@ class SubmapManager:
         registered_order: list[str] = []
         fused_order: list[str] = []
         provisional_order: list[str] = []
+        provisional_depths: dict[str, int] = {}
         batch_order: list[str] = []
 
         def remember_order(target: list[str], batch_id: str) -> None:
@@ -201,6 +281,7 @@ class SubmapManager:
                 remember_order(registered_order, batch_id)
             elif batch_id in previous.provisional_batch_order:
                 remember_order(provisional_order, batch_id)
+                provisional_depths[batch_id] = previous.provisional_depth(batch_id)
             elif batch_id not in batch_order:
                 batch_order.append(batch_id)
 
@@ -214,6 +295,7 @@ class SubmapManager:
             fused_batch_order=fused_order,
             provisional_batch_order=provisional_order,
             batch_order=batch_order,
+            provisional_depths=provisional_depths,
         )
         self.submaps.append(submap)
 
